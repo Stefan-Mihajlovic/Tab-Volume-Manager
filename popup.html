@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Tab Volume Manager</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div class="appWrapper">
+        <header>
+            <div>
+                <img src="icons/icon128.PNG" alt="Logo">
+                <h3>Tab Volume Manager</h3>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="themeToggle">
+                <span class="slider"></span>
+            </label>
+        </header>
+        <h3>Volume<span id="volumePC">100%</span></h3>
+        <input type="range" id="volumeSlider" min="0" max="100" value="100">
+        <section class="effectsHolder">
+            <button id="effectsOff" class="selected">Effects Off</button>
+            <button id="bassBoost">Bass Boost</button>
+            <button id="voiceBoost">Voice Clarity</button>
+        </section>
+        <button id="resetVolume">Reset volume to 100%</button>
+        <h3>Effect Intensity<span id="effectIntensityPC">50%</span></h3>
+        <input type="range" id="effectSlider" min="0" max="20" value="10">
+        <script src="popup.js"></script>
+    </div>
+  </body>
+</html>
