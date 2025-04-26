@@ -28,6 +28,16 @@ h3 {
   justify-content: space-between;
 }
 
+h3 img{
+  width: 20px;
+}
+
+h3 p{
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .appWrapper {
   display: flex;
   flex-direction: column;
@@ -70,7 +80,7 @@ input[type="range"] {
 .effectsHolder {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 5px;
+  gap: 6px;
 }
 
 button {
@@ -120,15 +130,14 @@ button.selected:hover {
 
 /* The slider */
 .slider {
-  --background: #16161b;
   position: absolute;
   cursor: pointer;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--background);
-  transition: 0.5s;
+  background-color: var(--bodyBackground);
+  transition: 0.3s;
   border-radius: 30px;
 }
 
@@ -140,16 +149,33 @@ button.selected:hover {
   border-radius: 50%;
   left: 10%;
   bottom: 15%;
-  box-shadow: inset 8px -4px 0px 0px white;
+  box-shadow: inset 8px -4px 0px 0px var(--textColor);
   background: var(--background);
-  transition: 0.5s;
-}
-
-input:checked + .slider {
-  background-color: #16161b;
+  transition: 0.3s;
 }
 
 input:checked + .slider:before {
   transform: translateX(100%);
-  box-shadow: inset 15px -4px 0px 15px white;
+  box-shadow: inset 15px -4px 0px 15px var(--textColor);
+}
+
+h3 span{
+  display: flex;
+  align-items: center;
+}
+
+h3 input{
+  margin-right: 5px;
+  background-color: var(--buttonColor);
+  border: none;
+  border-radius: 5px;
+  padding: 4px;
+  padding-left: 8px;
+  width: 55px;
+  text-align: left;
+  color: var(--textColor);
+}
+
+h3 input:hover{
+  background-color: var(--buttonDarker);
 }

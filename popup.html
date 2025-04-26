@@ -16,15 +16,15 @@
                 <span class="slider"></span>
             </label>
         </header>
-        <h3>Volume<span id="volumePC">100%</span></h3>
-        <input type="range" id="volumeSlider" min="0" max="100" value="100">
+        <h3><p>Volume</p><span id="volumePC"><input type="number" min="0" max="500" value="100" placeholder="100">%</span></h3>
+        <input type="range" id="volumeSlider" min="0" max="500" value="100">
         <section class="effectsHolder">
             <button id="effectsOff" class="selected">Effects Off</button>
             <button id="bassBoost">Bass Boost</button>
             <button id="voiceBoost">Voice Clarity</button>
         </section>
         <button id="resetVolume">Reset volume to 100%</button>
-        <h3>Effect Intensity<span id="effectIntensityPC">50%</span></h3>
+        <h3>Effect Intensity<span id="effectIntensityPC"><input type="number" min="0" max="100" value="50" placeholder="10">%</span></h3>
         <input type="range" id="effectSlider" min="0" max="20" value="10">
         <script src="popup.js"></script>
     </div>

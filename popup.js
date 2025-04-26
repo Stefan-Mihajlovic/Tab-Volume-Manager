@@ -43,6 +43,7 @@ themeToggle.addEventListener("change", () => {
 
 chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
   const hostname = new URL(tab.url).hostname;
+  document.querySelector("#volumePC").parentElement.querySelector("p").innerHTML = `<img src="${tab.favIconUrl}">Volume`;
   chrome.storage.local.get([hostname], (result) => {
     const preset = result[hostname];
     if (preset) {
@@ -146,6 +147,21 @@ async function updateAudio(volume) {
   });
 }
 
+const volumePC = document.querySelector("#volumePC input");
+const effectIntensityPC = document.querySelector("#effectIntensityPC input");
+volumePC.addEventListener("input", (e) => {
+  updateAudio(e.target.value);
+  savePreset(e.target.value, effectMode, effectAmount);
+  slider.value = e.target.value;
+});
+
+effectIntensityPC.addEventListener("input", (e) => {
+  effectAmount = parseInt(e.target.value / 5);
+  updateAudio(slider.value);
+  savePreset(slider.value, effectMode, effectAmount);
+  effectSlider.value = effectAmount;
+});
+
 slider.addEventListener("input", (e) => {
   updateAudio(e.target.value);
   updateVolumeProc();
@@ -187,12 +203,10 @@ resetVolumeBtn.addEventListener("click", () => {
   updateVolumeProc();
 });
 
-const volumePC = document.getElementById("volumePC");
 function updateVolumeProc() {
-  volumePC.innerHTML = slider.value + "%";
+  volumePC.value = slider.value;
 }
 
-const effectIntensityPC = document.getElementById("effectIntensityPC");
 function updateEffectsIntensityProc() {
-  effectIntensityPC.innerHTML = effectSlider.value * 5 + "%";
+  effectIntensityPC.value = effectSlider.value * 5;
 }
