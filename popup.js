@@ -92,56 +92,21 @@ function highlightSelectedButton(mode) {
 
 async function updateAudio(volume) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  console.log("[Popup] Applying audio settings:", {
-    volume,
-    effectMode,
-    effectAmount,
-  });
+
+  // Send message via content script
   chrome.scripting.executeScript({
     target: { tabId: tab.id },
+    world: "MAIN",
     func: (volume, effectMode, effectAmount) => {
-      const audios = document.querySelectorAll("video, audio");
-      audios.forEach((el) => {
-        if (!el._ctx) {
-          el._ctx = new AudioContext();
-          el._source = el._ctx.createMediaElementSource(el);
-          el._gainNode = el._ctx.createGain();
-        }
-
-        el._bassNode = el._ctx.createBiquadFilter();
-        el._bassNode.type = "lowshelf";
-        el._bassNode.frequency.value = 200;
-        el._bassNode.gain.value = effectMode === "bass" ? effectAmount : 0;
-
-        el._voiceNode = el._ctx.createBiquadFilter();
-        el._voiceNode.type = "peaking";
-        el._voiceNode.frequency.value = 1500;
-        el._voiceNode.Q.value = 1;
-        el._voiceNode.gain.value = effectMode === "voice" ? effectAmount : 0;
-
-        el._source.disconnect();
-        el._gainNode.disconnect();
-        try {
-          el._bassNode.disconnect();
-          el._voiceNode.disconnect();
-        } catch (_) {}
-
-        if (effectMode === "bass") {
-          el._source
-            .connect(el._bassNode)
-            .connect(el._gainNode)
-            .connect(el._ctx.destination);
-        } else if (effectMode === "voice") {
-          el._source
-            .connect(el._voiceNode)
-            .connect(el._gainNode)
-            .connect(el._ctx.destination);
-        } else {
-          el._source.connect(el._gainNode).connect(el._ctx.destination);
-        }
-
-        el._gainNode.gain.value = volume / 100;
-      });
+      window.postMessage(
+        {
+          type: "ZAZ_VOLUME_UPDATE",
+          volume: volume,
+          effectMode: effectMode,
+          effectAmount: effectAmount,
+        },
+        "*"
+      );
     },
     args: [parseInt(volume), effectMode, effectAmount],
   });
