@@ -6,27 +6,144 @@
   </head>
   <body>
     <div class="appWrapper">
-        <header>
-            <div>
-                <img src="icons/icon128.PNG" alt="Logo">
-                <h3>Tab Volume Manager</h3>
-            </div>
-            <label class="switch">
-                <input type="checkbox" id="themeToggle">
-                <span class="slider"></span>
-            </label>
-        </header>
-        <h3><p>Volume</p><span id="volumePC"><input type="number" min="0" max="500" value="100" placeholder="100">%</span></h3>
-        <input type="range" id="volumeSlider" min="0" max="500" value="100">
+      <header>
+        <div>
+          <img src="icons/icon128.PNG" alt="Logo">
+          <h3>Tab Volume Manager</h3>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="themeToggle">
+          <span class="slider"></span>
+        </label>
+      </header>
+
+      <section class="controlCard">
+        <div class="sectionHeading volumeHeading">
+          <div>
+            <span class="sectionEyebrow">Current tab</span>
+            <h3 class="sectionTitle">Website volume</h3>
+          </div>
+          <div id="siteIdentity" class="siteIdentity">
+            <img id="siteFavicon" src="icons/icon32.png" alt="">
+            <span id="siteName">Current website</span>
+          </div>
+        </div>
+        <div class="intensityBlock volumeBlock">
+          <h3>Volume<span id="volumePC" class="volumeValue"><input type="number" min="0" max="500" value="100" placeholder="100">%</span></h3>
+          <div class="sliderInset">
+            <input type="range" id="volumeSlider" min="0" max="500" value="100">
+          </div>
+        </div>
+      </section>
+
+      <section class="controlCard">
+        <div class="sectionHeading">
+          <div>
+            <span class="sectionEyebrow">Quick effects</span>
+            <h3 class="sectionTitle">Sound profile</h3>
+          </div>
+          <div class="profileOrb" aria-hidden="true">
+            <span class="profileGlow"></span>
+            <span class="profileRing profileRingOne"></span>
+            <span class="profileRing profileRingTwo"></span>
+            <span class="profileCore"></span>
+          </div>
+        </div>
         <section class="effectsHolder">
-            <button id="effectsOff" class="selected">Effects Off</button>
-            <button id="bassBoost">Bass Boost</button>
-            <button id="voiceBoost">Voice Clarity</button>
+          <button id="effectsOff" class="selected">Effects Off</button>
+          <button id="bassBoost">Bass Boost</button>
+          <button id="voiceBoost">Voice Clarity</button>
         </section>
         <button id="resetVolume">Reset volume to 100%</button>
-        <h3>Effect Intensity<span id="effectIntensityPC"><input type="number" min="0" max="100" value="50" placeholder="10">%</span></h3>
-        <input type="range" id="effectSlider" min="0" max="20" value="10">
-        <script src="popup.js"></script>
+      </section>
+
+      <section class="controlCard eqCard">
+        <div class="intensityBlock">
+          <h3>Effect Intensity<span id="effectIntensityPC"><input type="number" min="0" max="100" value="50" placeholder="10">%</span></h3>
+          <div class="sliderInset">
+            <input type="range" id="effectSlider" min="0" max="20" value="10">
+          </div>
+        </div>
+
+        <div class="equalizerToggleBlock">
+          <button id="toggleEqualizer" class="equalizerToggle" aria-expanded="false" aria-controls="equalizerPanel">
+            <span>Detailed equalizer</span>
+            <span class="equalizerArrowWrap" aria-hidden="true">
+              <svg id="equalizerArrow" class="equalizerArrow" viewBox="0 0 20 20" fill="none">
+                <path d="M5 8l5 5 5-5" />
+              </svg>
+            </span>
+          </button>
+        </div>
+
+        <section id="equalizerPanel" class="equalizerPanel hidden" aria-hidden="true">
+          <div class="equalizerPanelHeader">
+            <div>
+              <span class="sectionEyebrow">Detailed control</span>
+              <h3 class="sectionTitle">Equalizer</h3>
+            </div>
+            <button id="resetEqualizer" class="ghostButton">Reset EQ</button>
+          </div>
+
+          <p class="equalizerDescription">
+            Fine tune every band for the current website. Quick effects stay active and combine with these EQ adjustments.
+          </p>
+
+          <div class="eqVisualizer" aria-hidden="true">
+            <svg id="eqCurveSvg" class="eqCurveSvg" viewBox="0 0 320 62" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="eqAreaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#7b95ff" stop-opacity="0.38" />
+                  <stop offset="100%" stop-color="#7b95ff" stop-opacity="0.02" />
+                </linearGradient>
+                <linearGradient id="eqLineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#a5b8ff" />
+                  <stop offset="50%" stop-color="#6b86ff" />
+                  <stop offset="100%" stop-color="#d5ddff" />
+                </linearGradient>
+              </defs>
+              <path id="eqAreaPath" class="eqAreaPath"></path>
+              <path id="eqLinePath" class="eqLinePath"></path>
+              <g id="eqPoints"></g>
+            </svg>
+          </div>
+
+          <div class="eqGrid">
+            <label class="eqBand">
+              <span class="eqMeta"><strong>Sub Bass</strong><span id="eqValue0">0 dB</span></span>
+              <input type="range" class="eqSlider" data-band="0" min="-12" max="12" value="0">
+              <small>32 Hz</small>
+            </label>
+            <label class="eqBand">
+              <span class="eqMeta"><strong>Bass</strong><span id="eqValue1">0 dB</span></span>
+              <input type="range" class="eqSlider" data-band="1" min="-12" max="12" value="0">
+              <small>64 Hz</small>
+            </label>
+            <label class="eqBand">
+              <span class="eqMeta"><strong>Low Mid</strong><span id="eqValue2">0 dB</span></span>
+              <input type="range" class="eqSlider" data-band="2" min="-12" max="12" value="0">
+              <small>250 Hz</small>
+            </label>
+            <label class="eqBand">
+              <span class="eqMeta"><strong>Presence</strong><span id="eqValue3">0 dB</span></span>
+              <input type="range" class="eqSlider" data-band="3" min="-12" max="12" value="0">
+              <small>1 kHz</small>
+            </label>
+            <label class="eqBand">
+              <span class="eqMeta"><strong>Clarity</strong><span id="eqValue4">0 dB</span></span>
+              <input type="range" class="eqSlider" data-band="4" min="-12" max="12" value="0">
+              <small>4 kHz</small>
+            </label>
+            <label class="eqBand">
+              <span class="eqMeta"><strong>Air</strong><span id="eqValue5">0 dB</span></span>
+              <input type="range" class="eqSlider" data-band="5" min="-12" max="12" value="0">
+              <small>8 kHz</small>
+            </label>
+          </div>
+        </section>
+      </section>
+
+      <script src="popup.js"></script>
     </div>
   </body>
 </html>

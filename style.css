@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap");
 
 * {
   scroll-behavior: smooth;
@@ -9,109 +9,487 @@
 }
 
 :root {
-  --bodyBackground: #16161b;
-  --textColor: white;
-  --accentColor: #4751e7;
-  --accentDarker: #313bc4;
-  --buttonColor: #414141;
-  --buttonDarker: #2d3036;
+  --bodyBackground: #10131a;
+  --panelBackground: #181d27;
+  --panelSecondary: #111723;
+  --textColor: #f5f7ff;
+  --mutedText: #9ba6c4;
+  --accentColor: #4a6bff;
+  --accentDarker: #3450d4;
+  --buttonColor: #20283a;
+  --buttonDarker: #273146;
+  --borderColor: rgba(155, 175, 255, 0.12);
+  --shadowColor: rgba(0, 0, 0, 0.35);
+  --orbGlow: rgba(123, 149, 255, 0.56);
+  --orbRingOuter: rgba(168, 185, 255, 0.24);
+  --orbRingInner: rgba(220, 228, 255, 0.34);
+  --orbCoreShadow: rgba(111, 138, 255, 0.6);
+  --orbHalo: rgba(122, 146, 255, 0.06);
+  --arrowWrapBg: rgba(255, 255, 255, 0.08);
+  --arrowWrapBorder: rgba(255, 255, 255, 0.05);
+  --arrowWrapBgOpen: rgba(255, 255, 255, 0.14);
+  --arrowStroke: #dbe3ff;
 }
 
 body {
   width: 400px;
+  background: radial-gradient(circle at top, rgba(74, 107, 255, 0.18), transparent 42%), var(--bodyBackground);
+}
+
+h2,
+h3,
+p,
+small,
+span,
+strong,
+button,
+label {
+  color: var(--textColor);
 }
 
 h3 {
-  color: var(--textColor);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 600;
 }
 
-h3 img{
-  width: 20px;
+h3 img {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
 }
 
-h3 p{
+h3 p {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .appWrapper {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  height: 100%;
-  padding: 15px;
-  background: var(--bodyBackground);
+  min-height: 100%;
+  padding: 16px;
+  background: transparent;
 }
 
 header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: var(--accentColor);
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--accentColor), var(--accentDarker));
+  box-shadow: 0 14px 30px var(--shadowColor);
+}
+
+header div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+header img {
+  width: 32px;
+  height: 32px;
+}
+
+header h3 {
   color: white;
-  padding: 10px;
-  margin: -15px;
-  margin-bottom: 0px;
+  font-size: 16px;
 }
 
-header div{
-    display: flex;
-    align-items: center;
-    gap: 7px;
+.controlCard {
+  border: 1px solid var(--borderColor);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent), var(--panelBackground);
+  box-shadow: 0 12px 24px var(--shadowColor);
 }
 
-header img{
-    width: 30px;
+.sectionEyebrow {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
-header h3{
-    color: white;
+.sectionEyebrow {
+  color: var(--mutedText);
+}
+
+.controlCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.sectionHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sectionTitle {
+  justify-content: flex-start;
+  font-size: 16px;
+}
+
+.volumeHeading {
+  align-items: center;
+}
+
+.siteIdentity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 170px;
+  padding: 8px 10px;
+  border: 1px solid var(--borderColor);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.siteIdentity img {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.siteIdentity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--textColor);
+}
+
+.volumeValue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.volumeValue input {
+  background-color: var(--buttonColor);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 6px 8px;
+  width: 58px;
+  text-align: left;
+  color: var(--textColor);
+}
+
+.volumeValue input:hover,
+.volumeValue input:focus {
+  background-color: var(--buttonDarker);
+  outline: none;
+}
+
+.volumeValue span {
+  font-weight: 600;
+  color: var(--mutedText);
+}
+
+.profileOrb {
+  position: relative;
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  margin-top: -2px;
+}
+
+.profileGlow,
+.profileRing,
+.profileCore {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.profileGlow {
+  inset: 8px;
+  background: radial-gradient(circle, var(--orbGlow), rgba(123, 149, 255, 0));
+  filter: blur(6px);
+}
+
+.profileRing {
+  border: 1px solid rgba(155, 176, 255, 0.18);
+}
+
+.profileRingOne {
+  inset: 4px;
+  border-color: var(--orbRingOuter);
+  box-shadow: none;
+}
+
+.profileRingTwo {
+  inset: 14px;
+  border-color: var(--orbRingInner);
+}
+
+.profileCore {
+  inset: 22px;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.98), rgba(190, 206, 255, 0.6) 42%, rgba(123, 149, 255, 0.14) 78%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(123, 149, 255, 0.18));
+  box-shadow:
+    0 0 14px var(--orbCoreShadow),
+    0 0 0 6px var(--orbHalo);
 }
 
 input[type="range"] {
   width: 100%;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accentColor), rgba(74, 107, 255, 0.24));
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid white;
+  background: var(--accentColor);
+  box-shadow: 0 4px 14px rgba(74, 107, 255, 0.4);
+  cursor: pointer;
 }
 
 .effectsHolder {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 
 button {
   flex-grow: 1;
-  padding: 7px;
-  border-radius: 5px;
-  border: none;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
   cursor: pointer;
   color: var(--textColor);
   background-color: var(--buttonColor);
+  transition: background-color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 
 button:hover {
   background-color: var(--buttonDarker);
+  transform: translateY(-1px);
 }
 
 button.selected {
-  background-color: var(--accentColor);
-  color: var(--bodyBackground);
+  background: linear-gradient(135deg, var(--accentColor), var(--accentDarker));
+  color: white;
   font-weight: 600;
 }
+
 button.selected:hover {
-  background-color: var(--accentDarker);
+  background: linear-gradient(135deg, var(--accentColor), var(--accentDarker));
 }
 
-#resetVolume {
+#resetVolume,
+.equalizerToggle,
+.ghostButton {
   width: 100%;
 }
 
-/* From Uiverse.io by alexruix */
-/* The switch - the box around the slider */
+.intensityBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.volumeBlock {
+  margin-top: 2px;
+}
+
+.sliderInset {
+  padding-inline: 6px;
+}
+
+.equalizerToggleBlock {
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--borderColor);
+}
+
+.equalizerToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(74, 107, 255, 0.22), rgba(74, 107, 255, 0.08));
+  border-color: var(--borderColor);
+}
+
+.equalizerToggle strong {
+  font-size: 12px;
+  color: #c9d5ff;
+}
+
+.equalizerArrowWrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--arrowWrapBg);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: inset 0 0 0 1px var(--arrowWrapBorder);
+}
+
+.equalizerArrow {
+  width: 14px;
+  height: 14px;
+  stroke: var(--arrowStroke);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s ease;
+}
+
+.equalizerArrow.open {
+  transform: rotate(180deg);
+}
+
+.equalizerToggle[aria-expanded="true"] .equalizerArrowWrap {
+  background: var(--arrowWrapBgOpen);
+}
+
+.equalizerPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--borderColor);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(74, 107, 255, 0.08), transparent), var(--panelSecondary);
+}
+
+.hidden {
+  display: none;
+}
+
+.equalizerPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.equalizerDescription {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mutedText);
+}
+
+.eqVisualizer {
+  position: relative;
+  height: 62px;
+  border: 1px solid var(--borderColor);
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 15.8%,
+      rgba(255, 255, 255, 0.05) 15.8%,
+      rgba(255, 255, 255, 0.05) 16.4%
+    ),
+    linear-gradient(180deg, rgba(74, 107, 255, 0.08), rgba(74, 107, 255, 0.02));
+}
+
+.eqVisualizer::before {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.eqCurveSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.eqAreaPath {
+  fill: url(#eqAreaGradient);
+}
+
+.eqLinePath {
+  fill: none;
+  stroke: url(#eqLineGradient);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px rgba(74, 107, 255, 0.35));
+}
+
+.eqPointNode {
+  fill: #dfe6ff;
+  stroke: #8ea4ff;
+  stroke-width: 2;
+}
+
+.eqGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.eqBand {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--borderColor);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.eqMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.eqMeta strong {
+  font-size: 12px;
+}
+
+.eqMeta span,
+.eqBand small {
+  font-size: 11px;
+  color: var(--mutedText);
+}
+
+.ghostButton {
+  width: auto;
+  padding-inline: 12px;
+  background: transparent;
+  border-color: var(--borderColor);
+}
+
 .switch {
   font-size: 12px;
   position: relative;
@@ -121,22 +499,17 @@ button.selected:hover {
   margin-right: 2px;
 }
 
-/* Hide default HTML checkbox */
 .switch input {
   opacity: 0;
   width: 0;
   height: 0;
 }
 
-/* The slider */
 .slider {
   position: absolute;
   cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--bodyBackground);
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.18);
   transition: 0.3s;
   border-radius: 30px;
 }
@@ -149,33 +522,41 @@ button.selected:hover {
   border-radius: 50%;
   left: 10%;
   bottom: 15%;
-  box-shadow: inset 8px -4px 0px 0px var(--textColor);
-  background: var(--background);
+  box-shadow: inset 8px -4px 0 0 white;
+  background: transparent;
   transition: 0.3s;
 }
 
 input:checked + .slider:before {
   transform: translateX(100%);
-  box-shadow: inset 15px -4px 0px 15px var(--textColor);
+  box-shadow: inset 15px -4px 0 15px white;
 }
 
-h3 span{
+h3 span {
   display: flex;
   align-items: center;
+  color: var(--mutedText);
 }
 
-h3 input{
+h3 input {
   margin-right: 5px;
   background-color: var(--buttonColor);
-  border: none;
-  border-radius: 5px;
-  padding: 4px;
-  padding-left: 8px;
-  width: 55px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 6px 8px;
+  width: 58px;
   text-align: left;
   color: var(--textColor);
 }
 
-h3 input:hover{
+h3 input:hover,
+h3 input:focus {
   background-color: var(--buttonDarker);
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto;
+  }
 }

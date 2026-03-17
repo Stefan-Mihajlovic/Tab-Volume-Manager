@@ -1,50 +1,99 @@
 (function () {
   "use strict";
 
-  // Global state
+  const EQ_FREQUENCIES = [32, 64, 250, 1000, 4000, 8000];
+  const EQ_Q_VALUES = [0.8, 1, 1, 1.1, 1.2, 0.8];
+
   window.__zazVolumeManager = {
     gain: 1,
     effectMode: "none",
     effectAmount: 0,
+    eqBands: [0, 0, 0, 0, 0, 0],
     nodes: new WeakMap(),
     contexts: new Set(),
   };
 
   const manager = window.__zazVolumeManager;
 
-  // Create processing chain for a context
+  function createEqFilter(ctx, index) {
+    const filter = ctx.createBiquadFilter();
+
+    if (index === 0) {
+      filter.type = "lowshelf";
+    } else if (index === EQ_FREQUENCIES.length - 1) {
+      filter.type = "highshelf";
+    } else {
+      filter.type = "peaking";
+    }
+
+    filter.frequency.value = EQ_FREQUENCIES[index];
+    filter.Q.value = EQ_Q_VALUES[index];
+    filter.gain.value = 0;
+
+    return filter;
+  }
+
   function createProcessingChain(ctx) {
     const gain = ctx.createGain();
-    const bass = ctx.createBiquadFilter();
-    const voice = ctx.createBiquadFilter();
+    const effectBass = ctx.createBiquadFilter();
+    const effectVoice = ctx.createBiquadFilter();
+    const eqFilters = EQ_FREQUENCIES.map((_, index) => createEqFilter(ctx, index));
 
-    bass.type = "lowshelf";
-    bass.frequency.value = 200;
-    bass.gain.value = 0;
+    effectBass.type = "lowshelf";
+    effectBass.frequency.value = 180;
+    effectBass.gain.value = 0;
 
-    voice.type = "peaking";
-    voice.frequency.value = 1500;
-    voice.Q.value = 1;
-    voice.gain.value = 0;
+    effectVoice.type = "peaking";
+    effectVoice.frequency.value = 2200;
+    effectVoice.Q.value = 1.1;
+    effectVoice.gain.value = 0;
 
     gain.gain.value = manager.gain;
 
-    return { gain, bass, voice };
+    effectBass.connect(effectVoice);
+
+    let currentNode = effectVoice;
+    eqFilters.forEach((filter) => {
+      currentNode.connect(filter);
+      currentNode = filter;
+    });
+
+    currentNode.connect(gain);
+    gain.connect(ctx.destination);
+
+    return { gain, effectBass, effectVoice, eqFilters };
   }
 
-  // Apply current settings to all contexts
+  function getEffectCurve(mode, amount) {
+    if (mode === "bass") {
+      return [amount, amount * 0.55, amount * 0.2, 0, -amount * 0.15, -amount * 0.1];
+    }
+
+    if (mode === "voice") {
+      return [-amount * 0.15, -amount * 0.1, amount * 0.25, amount * 0.55, amount * 0.85, amount * 0.2];
+    }
+
+    return [0, 0, 0, 0, 0, 0];
+  }
+
   function applySettings() {
+    const effectCurve = getEffectCurve(manager.effectMode, manager.effectAmount);
+
     manager.contexts.forEach((ctx) => {
       const nodes = manager.nodes.get(ctx);
       if (!nodes) return;
 
       nodes.gain.gain.value = manager.gain;
-      nodes.bass.gain.value = manager.effectMode === "bass" ? manager.effectAmount : 0;
-      nodes.voice.gain.value = manager.effectMode === "voice" ? manager.effectAmount : 0;
+      nodes.effectBass.gain.value = manager.effectMode === "bass" ? manager.effectAmount : 0;
+      nodes.effectVoice.gain.value = manager.effectMode === "voice" ? manager.effectAmount : 0;
+
+      nodes.eqFilters.forEach((filter, index) => {
+        const manualEq = Number(manager.eqBands[index] ?? 0);
+        filter.gain.value = manualEq + effectCurve[index];
+      });
     });
   }
 
-  // Override AudioContext
   const OriginalAudioContext = window.AudioContext || window.webkitAudioContext;
 
   if (OriginalAudioContext) {
@@ -54,16 +103,10 @@
       const ctx = new OriginalAudioContext(...args);
       const chain = createProcessingChain(ctx);
 
-      // Connect chain: bass -> voice -> gain -> destination
-      chain.bass.connect(chain.voice);
-      chain.voice.connect(chain.gain);
-      chain.gain.connect(ctx.destination);
-
       manager.nodes.set(ctx, chain);
       manager.contexts.add(ctx);
 
-      // Create a proxy destination
-      ctx.__zazDestination = chain.bass;
+      ctx.__zazDestination = chain.effectBass;
       ctx.__realDestination = ctx.destination;
 
       return ctx;
@@ -72,7 +115,6 @@
     PatchedAudioContext.prototype = OriginalAudioContext.prototype;
     Object.setPrototypeOf(PatchedAudioContext, OriginalAudioContext);
 
-    // Intercept connections to destination
     AudioNode.prototype.connect = function (dest, ...args) {
       const ctx = this.context;
       if (
@@ -82,6 +124,7 @@
       ) {
         return originalConnect.call(this, ctx.__zazDestination, ...args);
       }
+
       return originalConnect.call(this, dest, ...args);
     };
 
@@ -91,24 +134,19 @@
     }
   }
 
-  // Handle <audio> and <video> elements
   function processMediaElement(el) {
     if (el.__zazProcessed) return;
     el.__zazProcessed = true;
 
-    // Wait for the element to be ready
     const setup = () => {
       try {
-        if (el.__zazCtx) return;
+        if (el.__zazCtx || !OriginalAudioContext) return;
 
         const ctx = new OriginalAudioContext();
         const source = ctx.createMediaElementSource(el);
         const chain = createProcessingChain(ctx);
 
-        source.connect(chain.bass);
-        chain.bass.connect(chain.voice);
-        chain.voice.connect(chain.gain);
-        chain.gain.connect(ctx.destination);
+        source.connect(chain.effectBass);
 
         el.__zazCtx = ctx;
         manager.nodes.set(ctx, chain);
@@ -116,7 +154,7 @@
 
         applySettings();
       } catch (e) {
-        // CORS or already connected - ignore
+        // Ignore media that cannot be patched.
       }
     };
 
@@ -127,7 +165,6 @@
     }
   }
 
-  // Observe DOM for media elements
   function observeMedia() {
     document.querySelectorAll("video, audio").forEach(processMediaElement);
 
@@ -156,12 +193,14 @@
     observeMedia();
   }
 
-  // Listen for messages from popup
   window.addEventListener("message", (e) => {
     if (e.data?.type === "ZAZ_VOLUME_UPDATE") {
       manager.gain = e.data.volume / 100;
       manager.effectMode = e.data.effectMode;
       manager.effectAmount = e.data.effectAmount;
+      manager.eqBands = Array.isArray(e.data.eqBands) && e.data.eqBands.length === 6
+        ? e.data.eqBands.map((band) => Number(band) || 0)
+        : [0, 0, 0, 0, 0, 0];
       applySettings();
     }
   });

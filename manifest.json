@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tab Volume Manager",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Control volume and optionally add audio effects like bass boost or voice clarity.",
   "permissions": ["activeTab", "scripting", "tabs", "storage"],
   "host_permissions": ["<all_urls>"],
