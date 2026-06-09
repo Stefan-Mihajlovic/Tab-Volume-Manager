@@ -111,6 +111,74 @@ header h3 {
   box-shadow: 0 12px 24px var(--shadowColor);
 }
 
+.reviewPrompt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 46px 11px 12px;
+  border: 1px solid var(--borderColor);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(74, 107, 255, 0.16), rgba(74, 107, 255, 0.04)),
+    var(--panelBackground);
+  box-shadow: 0 10px 22px var(--shadowColor);
+}
+
+.reviewCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.reviewCopy span {
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: var(--textColor);
+}
+
+.reviewStoreButton {
+  width: fit-content;
+  flex-grow: 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accentColor), var(--accentDarker));
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.reviewStoreButton:hover {
+  background: linear-gradient(135deg, var(--accentColor), var(--accentDarker));
+}
+
+.dismissReviewPrompt {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--borderColor);
+}
+
+.dismissReviewPrompt svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--mutedText);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
 .sectionEyebrow {
   display: inline-block;
   font-size: 11px;

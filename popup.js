@@ -17,7 +17,18 @@ const eqSliders = Array.from(document.querySelectorAll(".eqSlider"));
 const eqAreaPath = document.getElementById("eqAreaPath");
 const eqLinePath = document.getElementById("eqLinePath");
 const eqPointsGroup = document.getElementById("eqPoints");
+const reviewPrompt = document.getElementById("reviewPrompt");
+const reviewStoreButton = document.getElementById("reviewStoreButton");
+const dismissReviewPrompt = document.getElementById("dismissReviewPrompt");
 const EQ_DEFAULTS = [0, 0, 0, 0, 0, 0];
+const REVIEW_STORE = "Chrome"; // "Edge" or "Chrome"
+const REVIEW_STORE_LINKS = {
+  Chrome: "https://chromewebstore.google.com/detail/tab-volume-manager/hnpafnldgablhjgagcfhjjaaalliegef",
+  Edge: "https://microsoftedge.microsoft.com/addons/detail/tab-volume-manager/pkninbkmgnhgiahpgcifjebbkgmafhoo",
+};
+const REVIEW_PROMPT_DISMISSED_AT_KEY = "reviewPromptDismissedAt";
+const REVIEW_PROMPT_RATED_KEY = "reviewPromptRated";
+const REVIEW_PROMPT_HIDE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 let activeHostname = null;
 let effectMode = "none";
@@ -184,6 +195,47 @@ function syncEqualizerUI() {
   });
   updateEqualizerLabels();
   renderEqualizerCurve();
+}
+
+function getReviewStoreConfig() {
+  const normalizedStore = REVIEW_STORE_LINKS[REVIEW_STORE] ? REVIEW_STORE : "Chrome";
+
+  return {
+    name: normalizedStore,
+    buttonLabel: `Rate on ${normalizedStore === "Edge" ? "Edge Store" : "Chrome Web Store"}`,
+    url: REVIEW_STORE_LINKS[normalizedStore],
+  };
+}
+
+function setupReviewPrompt() {
+  if (!reviewPrompt || !reviewStoreButton || !dismissReviewPrompt) return;
+
+  const storeConfig = getReviewStoreConfig();
+  reviewStoreButton.textContent = storeConfig.buttonLabel;
+
+  chrome.storage.local.get(
+    [REVIEW_PROMPT_DISMISSED_AT_KEY, REVIEW_PROMPT_RATED_KEY],
+    (result) => {
+      if (result[REVIEW_PROMPT_RATED_KEY]) return;
+
+      const dismissedAt = Number(result[REVIEW_PROMPT_DISMISSED_AT_KEY] || 0);
+      const canShowAgain =
+        !dismissedAt || Date.now() - dismissedAt >= REVIEW_PROMPT_HIDE_DURATION_MS;
+
+      reviewPrompt.classList.toggle("hidden", !canShowAgain);
+    }
+  );
+
+  dismissReviewPrompt.addEventListener("click", () => {
+    reviewPrompt.classList.add("hidden");
+    chrome.storage.local.set({ [REVIEW_PROMPT_DISMISSED_AT_KEY]: Date.now() });
+  });
+
+  reviewStoreButton.addEventListener("click", () => {
+    reviewPrompt.classList.add("hidden");
+    chrome.storage.local.set({ [REVIEW_PROMPT_RATED_KEY]: true });
+    chrome.tabs.create({ url: storeConfig.url });
+  });
 }
 
 function savePreset(volume, mode, amount, bands = eqBands) {
@@ -369,3 +421,4 @@ updateEffectsIntensityProc();
 syncEqualizerUI();
 setEqualizerOpen(false);
 highlightSelectedButton(effectMode);
+setupReviewPrompt();
