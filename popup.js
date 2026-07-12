@@ -85,7 +85,15 @@ function setActiveTab(tabName, save = true) {
 
 function setupTabs() {
   tabButtons.forEach((button, index) => {
-    button.addEventListener("click", () => setActiveTab(button.dataset.tab));
+    button.addEventListener("click", () => {
+      setActiveTab(button.dataset.tab);
+
+      if (button.dataset.tab === "pro") {
+        button.classList.remove("proTabActivated");
+        void button.offsetWidth;
+        button.classList.add("proTabActivated");
+      }
+    });
     button.addEventListener("keydown", (event) => {
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
 

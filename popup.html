@@ -27,6 +27,9 @@
         <button id="equalizerTab" class="tabButton" type="button" role="tab" aria-selected="false" aria-controls="equalizerPanel" data-tab="equalizer" tabindex="-1">
           Equalizer
         </button>
+        <button id="proTab" class="tabButton proTabButton" type="button" role="tab" aria-selected="false" aria-controls="proPanel" data-tab="pro" tabindex="-1">
+          <span class="proTabSpark" aria-hidden="true">&#10022;</span> Pro
+        </button>
       </nav>
 
       <main class="tabContent">
@@ -109,6 +112,56 @@
               </div>
             </div>
             <button id="resetEqualizer" class="secondaryAction">Reset EQ</button>
+          </section>
+        </section>
+
+        <section id="proPanel" class="tabPanel hidden" role="tabpanel" aria-labelledby="proTab" data-panel="pro">
+          <section class="controlCard proCard">
+            <div class="proHero">
+              <span class="proComingBadge"><span aria-hidden="true">&#10022;</span> Pro coming soon</span>
+              <h2>More control. Better sound.</h2>
+              <p>Advanced audio tools for movies, music, gaming and every tab you open.</p>
+              <div class="proOrb" aria-hidden="true">
+                <span></span>
+              </div>
+            </div>
+
+            <div class="proFeatureGrid">
+              <article class="proFeature">
+                <span class="proFeatureIcon" aria-hidden="true">&#9889;</span>
+                <div><strong>Smart Limiter</strong><small>Boost without harsh clipping</small></div>
+              </article>
+              <article class="proFeature">
+                <span class="proFeatureIcon" aria-hidden="true">A</span>
+                <div><strong>Adaptive Volume</strong><small>Automatically balance loudness</small></div>
+              </article>
+              <article class="proFeature">
+                <span class="proFeatureIcon" aria-hidden="true">&#9654;</span>
+                <div><strong>Movie Dialogue</strong><small>Clear voices and controlled dynamics</small></div>
+              </article>
+              <article class="proFeature">
+                <span class="proFeatureIcon" aria-hidden="true">10</span>
+                <div><strong>10-band EQ</strong><small>More precise sound shaping</small></div>
+              </article>
+              <article class="proFeature">
+                <span class="proFeatureIcon" aria-hidden="true">&#9776;</span>
+                <div><strong>Multi-tab Mixer</strong><small>Control every audible tab</small></div>
+              </article>
+              <article class="proFeature">
+                <span class="proFeatureIcon" aria-hidden="true">&#8734;</span>
+                <div><strong>Unlimited Presets</strong><small>Save profiles for every setup</small></div>
+              </article>
+            </div>
+
+            <p class="proMoreFeatures">Plus stereo balance, mono audio, shortcuts, sleep timer, cloud sync and automatic site profiles.</p>
+
+            <div class="proPricing" aria-label="Planned Pro pricing">
+              <div><strong>$2.49</strong><small>Monthly</small></div>
+              <div class="featuredPrice"><span>Best value</span><strong>$14.99</strong><small>Yearly</small></div>
+              <div><strong>$29.99</strong><small>Lifetime</small></div>
+            </div>
+
+            <button class="proComingButton" type="button" disabled>Pro is coming soon</button>
           </section>
         </section>
       </main>
