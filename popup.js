@@ -255,6 +255,25 @@ async function updateAudio(volume) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
 
+  const settings = {
+    volume: parseInt(volume, 10),
+    effectMode,
+    effectAmount,
+    eqBands: eqBands.map(Number),
+  };
+
+  try {
+    const result = await chrome.runtime.sendMessage({
+      type: "ZAZ_CAPTURE_TAB",
+      tabId: tab.id,
+      settings,
+    });
+
+    if (result?.ok) return;
+  } catch (error) {
+    // Fall through to DOM processing on unsupported/restricted pages.
+  }
+
   try {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -271,7 +290,7 @@ async function updateAudio(volume) {
           "*"
         );
       },
-      args: [parseInt(volume, 10), effectMode, effectAmount, eqBands.map(Number)],
+      args: [settings.volume, effectMode, effectAmount, settings.eqBands],
     });
   } catch (error) {
     // Ignore pages where script injection is not allowed.
