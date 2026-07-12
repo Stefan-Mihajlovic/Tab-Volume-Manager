@@ -5,36 +5,38 @@ const bassBoostBtn = document.getElementById("bassBoost");
 const voiceBoostBtn = document.getElementById("voiceBoost");
 const effectsOffBtn = document.getElementById("effectsOff");
 const resetVolumeBtn = document.getElementById("resetVolume");
-const toggleEqualizerBtn = document.getElementById("toggleEqualizer");
-const equalizerPanel = document.getElementById("equalizerPanel");
-const equalizerArrow = document.getElementById("equalizerArrow");
 const resetEqualizerBtn = document.getElementById("resetEqualizer");
 const siteFavicon = document.getElementById("siteFavicon");
 const siteName = document.getElementById("siteName");
 const volumePC = document.querySelector("#volumePC input");
 const effectIntensityPC = document.querySelector("#effectIntensityPC input");
 const eqSliders = Array.from(document.querySelectorAll(".eqSlider"));
-const eqAreaPath = document.getElementById("eqAreaPath");
-const eqLinePath = document.getElementById("eqLinePath");
-const eqPointsGroup = document.getElementById("eqPoints");
-const reviewPrompt = document.getElementById("reviewPrompt");
-const reviewStoreButton = document.getElementById("reviewStoreButton");
-const dismissReviewPrompt = document.getElementById("dismissReviewPrompt");
+const eqLevelMeters = Array.from(document.querySelectorAll(".eqLevelMeter"));
+const tabButtons = Array.from(document.querySelectorAll(".tabButton"));
+const tabPanels = Array.from(document.querySelectorAll(".tabPanel"));
+const presetStatus = document.getElementById("presetStatus");
+const savePresetButton = document.getElementById("savePresetButton");
+const loadPresetButton = document.getElementById("loadPresetButton");
+const savePresetModal = document.getElementById("savePresetModal");
+const loadPresetModal = document.getElementById("loadPresetModal");
+const presetNameInput = document.getElementById("presetNameInput");
+const presetNameError = document.getElementById("presetNameError");
+const confirmSavePreset = document.getElementById("confirmSavePreset");
+const savedPresetSlot = document.getElementById("savedPresetSlot");
+const savedPresetName = document.getElementById("savedPresetName");
+const savedPresetSummary = document.getElementById("savedPresetSummary");
 const EQ_DEFAULTS = [0, 0, 0, 0, 0, 0];
-const REVIEW_STORE = "Chrome"; // "Edge" or "Chrome"
-const REVIEW_STORE_LINKS = {
-  Chrome: "https://chromewebstore.google.com/detail/tab-volume-manager/hnpafnldgablhjgagcfhjjaaalliegef",
-  Edge: "https://microsoftedge.microsoft.com/addons/detail/tab-volume-manager/pkninbkmgnhgiahpgcifjebbkgmafhoo",
-};
-const REVIEW_PROMPT_DISMISSED_AT_KEY = "reviewPromptDismissedAt";
-const REVIEW_PROMPT_RATED_KEY = "reviewPromptRated";
-const REVIEW_PROMPT_HIDE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+const ACTIVE_TAB_KEY = "activeControlTab";
+const SAVED_EQ_PRESET_KEY = "savedEqPreset";
+const meterPort = chrome.runtime.connect({ name: "ZAZ_METER" });
 
 let activeHostname = null;
+let activeTabId = null;
 let effectMode = "none";
 let effectAmount = 10;
 let eqBands = [...EQ_DEFAULTS];
-let isEqualizerOpen = false;
+let savedEqPreset = null;
+let loadedPresetName = null;
 
 function applyTheme(theme) {
   const isLight = theme === "light";
@@ -62,12 +64,156 @@ function applyTheme(theme) {
   themeToggle.checked = isLight;
 }
 
-function setEqualizerOpen(open) {
-  isEqualizerOpen = open;
-  equalizerPanel.classList.toggle("hidden", !open);
-  equalizerPanel.setAttribute("aria-hidden", String(!open));
-  toggleEqualizerBtn.setAttribute("aria-expanded", String(open));
-  equalizerArrow.classList.toggle("open", open);
+function setActiveTab(tabName, save = true) {
+  const validTab = tabButtons.some((button) => button.dataset.tab === tabName)
+    ? tabName
+    : "volume";
+
+  tabButtons.forEach((button) => {
+    const active = button.dataset.tab === validTab;
+    button.classList.toggle("selected", active);
+    button.setAttribute("aria-selected", String(active));
+    button.tabIndex = active ? 0 : -1;
+  });
+
+  tabPanels.forEach((panel) => {
+    panel.classList.toggle("hidden", panel.dataset.panel !== validTab);
+  });
+
+  if (save) chrome.storage.local.set({ [ACTIVE_TAB_KEY]: validTab });
+}
+
+function setupTabs() {
+  tabButtons.forEach((button, index) => {
+    button.addEventListener("click", () => setActiveTab(button.dataset.tab));
+    button.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+
+      event.preventDefault();
+      let nextIndex = index;
+      if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabButtons.length) % tabButtons.length;
+      if (event.key === "ArrowRight") nextIndex = (index + 1) % tabButtons.length;
+      if (event.key === "Home") nextIndex = 0;
+      if (event.key === "End") nextIndex = tabButtons.length - 1;
+
+      tabButtons[nextIndex].focus();
+      setActiveTab(tabButtons[nextIndex].dataset.tab);
+    });
+  });
+
+  chrome.storage.local.get(ACTIVE_TAB_KEY, (result) => {
+    setActiveTab(result[ACTIVE_TAB_KEY] || "volume", false);
+  });
+}
+
+function updatePresetStatus() {
+  presetStatus.textContent = loadedPresetName
+    ? `Preset “${loadedPresetName}”`
+    : "No preset loaded";
+}
+
+function clearLoadedPreset() {
+  loadedPresetName = null;
+  updatePresetStatus();
+}
+
+function closeModal(modal) {
+  modal.classList.add("hidden");
+}
+
+function openModal(modal) {
+  modal.classList.remove("hidden");
+}
+
+function updateSavedPresetSlot() {
+  const hasPreset = Boolean(savedEqPreset);
+  savedPresetSlot.disabled = !hasPreset;
+  savedPresetSlot.classList.toggle("emptyPresetSlot", !hasPreset);
+  savedPresetName.textContent = hasPreset ? savedEqPreset.name : "Empty preset slot";
+  savedPresetSummary.textContent = hasPreset
+    ? "6-band EQ • Click to load"
+    : "Save an EQ preset first";
+}
+
+function setupPresetControls() {
+  chrome.storage.local.get(SAVED_EQ_PRESET_KEY, (result) => {
+    const preset = result[SAVED_EQ_PRESET_KEY];
+    if (
+      preset &&
+      typeof preset.name === "string" &&
+      Array.isArray(preset.eqBands) &&
+      preset.eqBands.length === 6
+    ) {
+      savedEqPreset = {
+        name: preset.name,
+        eqBands: preset.eqBands.map((band) => Math.max(-12, Math.min(12, Number(band) || 0))),
+      };
+    }
+    updateSavedPresetSlot();
+  });
+
+  savePresetButton.addEventListener("click", () => {
+    presetNameInput.value = savedEqPreset?.name || "";
+    presetNameError.classList.add("hidden");
+    openModal(savePresetModal);
+    requestAnimationFrame(() => presetNameInput.focus());
+  });
+
+  loadPresetButton.addEventListener("click", () => {
+    updateSavedPresetSlot();
+    openModal(loadPresetModal);
+  });
+
+  confirmSavePreset.addEventListener("click", () => {
+    const name = presetNameInput.value.trim();
+    if (!name) {
+      presetNameError.classList.remove("hidden");
+      presetNameInput.focus();
+      return;
+    }
+
+    savedEqPreset = { name, eqBands: eqBands.map(Number) };
+    loadedPresetName = name;
+    updatePresetStatus();
+    updateSavedPresetSlot();
+    savePreset(slider.value, effectMode, effectAmount);
+    chrome.storage.local.set({ [SAVED_EQ_PRESET_KEY]: savedEqPreset });
+    closeModal(savePresetModal);
+  });
+
+  presetNameInput.addEventListener("input", () => presetNameError.classList.add("hidden"));
+  presetNameInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") confirmSavePreset.click();
+  });
+
+  savedPresetSlot.addEventListener("click", () => {
+    if (!savedEqPreset) return;
+    eqBands = [...savedEqPreset.eqBands];
+    loadedPresetName = savedEqPreset.name;
+    syncEqualizerUI();
+    updatePresetStatus();
+    updateAudio(slider.value);
+    savePreset(slider.value, effectMode, effectAmount);
+    closeModal(loadPresetModal);
+  });
+
+  document.querySelectorAll("[data-close-modal]").forEach((button) => {
+    button.addEventListener("click", () => {
+      closeModal(document.getElementById(button.dataset.closeModal));
+    });
+  });
+
+  [savePresetModal, loadPresetModal].forEach((modal) => {
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) closeModal(modal);
+    });
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    closeModal(savePresetModal);
+    closeModal(loadPresetModal);
+  });
 }
 
 function highlightSelectedButton(mode) {
@@ -142,100 +288,11 @@ function updateEqualizerLabels() {
   });
 }
 
-function createSmoothPath(points) {
-  if (!points.length) return "";
-
-  let path = `M ${points[0].x} ${points[0].y}`;
-
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const current = points[i];
-    const next = points[i + 1];
-    const controlX = (current.x + next.x) / 2;
-
-    path += ` C ${controlX} ${current.y}, ${controlX} ${next.y}, ${next.x} ${next.y}`;
-  }
-
-  return path;
-}
-
-function renderEqualizerCurve() {
-  const width = 320;
-  const height = 62;
-  const paddingX = 24;
-  const topPadding = 11;
-  const bottomPadding = 12;
-  const usableHeight = height - topPadding - bottomPadding;
-  const centerY = topPadding + usableHeight / 2;
-  const maxDb = 12;
-
-  const points = eqBands.map((band, index) => {
-    const x = paddingX + ((width - paddingX * 2) / (eqBands.length - 1)) * index;
-    const normalized = Math.max(-maxDb, Math.min(maxDb, Number(band)));
-    const y = centerY - (normalized / maxDb) * (usableHeight / 2);
-    return { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) };
-  });
-
-  const linePath = createSmoothPath(points);
-  const areaPath = `${linePath} L ${points[points.length - 1].x} ${height - bottomPadding} L ${points[0].x} ${height - bottomPadding} Z`;
-
-  eqLinePath.setAttribute("d", linePath);
-  eqAreaPath.setAttribute("d", areaPath);
-
-  eqPointsGroup.innerHTML = points
-    .map(
-      (point) =>
-        `<circle class="eqPointNode" cx="${point.x}" cy="${point.y}" r="4.5"></circle>`
-    )
-    .join("");
-}
-
 function syncEqualizerUI() {
   eqSliders.forEach((eqSlider, index) => {
     eqSlider.value = eqBands[index];
   });
   updateEqualizerLabels();
-  renderEqualizerCurve();
-}
-
-function getReviewStoreConfig() {
-  const normalizedStore = REVIEW_STORE_LINKS[REVIEW_STORE] ? REVIEW_STORE : "Chrome";
-
-  return {
-    name: normalizedStore,
-    buttonLabel: `Rate on ${normalizedStore === "Edge" ? "Edge Store" : "Chrome Web Store"}`,
-    url: REVIEW_STORE_LINKS[normalizedStore],
-  };
-}
-
-function setupReviewPrompt() {
-  if (!reviewPrompt || !reviewStoreButton || !dismissReviewPrompt) return;
-
-  const storeConfig = getReviewStoreConfig();
-  reviewStoreButton.textContent = storeConfig.buttonLabel;
-
-  chrome.storage.local.get(
-    [REVIEW_PROMPT_DISMISSED_AT_KEY, REVIEW_PROMPT_RATED_KEY],
-    (result) => {
-      if (result[REVIEW_PROMPT_RATED_KEY]) return;
-
-      const dismissedAt = Number(result[REVIEW_PROMPT_DISMISSED_AT_KEY] || 0);
-      const canShowAgain =
-        !dismissedAt || Date.now() - dismissedAt >= REVIEW_PROMPT_HIDE_DURATION_MS;
-
-      reviewPrompt.classList.toggle("hidden", !canShowAgain);
-    }
-  );
-
-  dismissReviewPrompt.addEventListener("click", () => {
-    reviewPrompt.classList.add("hidden");
-    chrome.storage.local.set({ [REVIEW_PROMPT_DISMISSED_AT_KEY]: Date.now() });
-  });
-
-  reviewStoreButton.addEventListener("click", () => {
-    reviewPrompt.classList.add("hidden");
-    chrome.storage.local.set({ [REVIEW_PROMPT_RATED_KEY]: true });
-    chrome.tabs.create({ url: storeConfig.url });
-  });
 }
 
 function savePreset(volume, mode, amount, bands = eqBands) {
@@ -247,6 +304,7 @@ function savePreset(volume, mode, amount, bands = eqBands) {
       effectMode: mode,
       effectAmount: parseInt(amount, 10),
       eqBands: bands.map((band) => parseInt(band, 10)),
+      eqPresetName: loadedPresetName,
     },
   });
 }
@@ -313,6 +371,8 @@ themeToggle.addEventListener("change", () => {
 
 chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
   if (!tab?.url) return;
+  activeTabId = tab.id;
+  meterPort.postMessage({ type: "ZAZ_METER_SUBSCRIBE", tabId: activeTabId });
 
   let hostname;
   try {
@@ -334,6 +394,8 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     const preset = result[hostname];
 
     if (!preset) {
+      loadedPresetName = null;
+      updatePresetStatus();
       updateVolumeProc();
       updateEffectsIntensityProc();
       syncEqualizerUI();
@@ -348,12 +410,26 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     eqBands = Array.isArray(preset.eqBands) && preset.eqBands.length === 6
       ? preset.eqBands.map((band) => parseInt(band, 10) || 0)
       : [...EQ_DEFAULTS];
+    loadedPresetName = typeof preset.eqPresetName === "string"
+      ? preset.eqPresetName
+      : null;
 
     updateEffectsIntensityProc();
     updateVolumeProc();
     syncEqualizerUI();
     highlightSelectedButton(effectMode);
+    updatePresetStatus();
     updateAudio(slider.value);
+  });
+});
+
+meterPort.onMessage.addListener((message) => {
+  if (message?.type !== "ZAZ_EQ_LEVELS" || message.tabId !== activeTabId) return;
+  if (!Array.isArray(message.levels) || message.levels.length !== eqLevelMeters.length) return;
+
+  eqLevelMeters.forEach((meter, index) => {
+    const level = Math.max(0, Math.min(100, Number(message.levels[index]) || 0));
+    meter.style.setProperty("--level", `${level}%`);
   });
 });
 
@@ -407,21 +483,18 @@ effectsOffBtn.addEventListener("click", () => {
   savePreset(slider.value, effectMode, effectAmount);
 });
 
-toggleEqualizerBtn.addEventListener("click", () => {
-  setEqualizerOpen(!isEqualizerOpen);
-});
-
 eqSliders.forEach((eqSlider, index) => {
   eqSlider.addEventListener("input", (e) => {
+    clearLoadedPreset();
     eqBands[index] = parseInt(e.target.value, 10);
     updateEqualizerLabels();
-    renderEqualizerCurve();
     updateAudio(slider.value);
     savePreset(slider.value, effectMode, effectAmount);
   });
 });
 
 resetEqualizerBtn.addEventListener("click", () => {
+  clearLoadedPreset();
   eqBands = [...EQ_DEFAULTS];
   syncEqualizerUI();
   updateAudio(slider.value);
@@ -438,6 +511,7 @@ resetVolumeBtn.addEventListener("click", () => {
 updateVolumeProc();
 updateEffectsIntensityProc();
 syncEqualizerUI();
-setEqualizerOpen(false);
 highlightSelectedButton(effectMode);
-setupReviewPrompt();
+setupTabs();
+setupPresetControls();
+updatePresetStatus();

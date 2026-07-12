@@ -2,6 +2,48 @@ const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 
 let creatingOffscreenDocument = null;
 const tabTasks = new Map();
+const meterSubscribers = new Map();
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== "ZAZ_METER") return;
+
+  let subscribedTabId = null;
+
+  port.onMessage.addListener((message) => {
+    if (message?.type !== "ZAZ_METER_SUBSCRIBE" || !Number.isInteger(message.tabId)) return;
+
+    if (subscribedTabId !== null) {
+      meterSubscribers.get(subscribedTabId)?.delete(port);
+    }
+
+    subscribedTabId = message.tabId;
+    if (!meterSubscribers.has(subscribedTabId)) {
+      meterSubscribers.set(subscribedTabId, new Set());
+    }
+    meterSubscribers.get(subscribedTabId).add(port);
+  });
+
+  port.onDisconnect.addListener(() => {
+    if (subscribedTabId === null) return;
+    const subscribers = meterSubscribers.get(subscribedTabId);
+    subscribers?.delete(port);
+    if (subscribers?.size === 0) meterSubscribers.delete(subscribedTabId);
+  });
+});
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type !== "ZAZ_EQ_LEVELS" || message.target !== "background") return false;
+
+  meterSubscribers.get(message.tabId)?.forEach((port) => {
+    try {
+      port.postMessage(message);
+    } catch (error) {
+      // The popup may have closed between frames.
+    }
+  });
+
+  return false;
+});
 
 async function ensureOffscreenDocument() {
   const offscreenUrl = chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH);
@@ -77,6 +119,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabTasks.delete(tabId);
+  meterSubscribers.delete(tabId);
   chrome.runtime.sendMessage({
     type: "ZAZ_OFFSCREEN_STOP",
     target: "offscreen",

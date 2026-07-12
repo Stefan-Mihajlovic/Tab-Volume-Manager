@@ -104,79 +104,70 @@ header h3 {
   font-size: 16px;
 }
 
+.tabNavigation {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  padding: 5px;
+  border: 1px solid var(--borderColor);
+  border-radius: 15px;
+  background: var(--panelSecondary);
+  box-shadow: 0 10px 22px var(--shadowColor);
+}
+
+.tabButton {
+  position: relative;
+  padding: 9px 8px;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--mutedText);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tabButton:hover {
+  background: rgba(74, 107, 255, 0.1);
+  color: var(--textColor);
+  transform: none;
+}
+
+.tabButton.selected,
+.tabButton.selected:hover {
+  background: linear-gradient(135deg, var(--accentColor), var(--accentDarker));
+  color: white;
+  box-shadow: 0 6px 16px rgba(52, 80, 212, 0.26);
+}
+
+.tabButton:focus-visible {
+  outline: 2px solid var(--accentColor);
+  outline-offset: 2px;
+}
+
+.tabContent,
+.tabPanel {
+  width: 100%;
+}
+
+.tabPanel:not(.hidden) {
+  animation: tabPanelIn 0.18s ease-out;
+}
+
+@keyframes tabPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .controlCard {
   border: 1px solid var(--borderColor);
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent), var(--panelBackground);
   box-shadow: 0 12px 24px var(--shadowColor);
-}
-
-.reviewPrompt {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 11px 46px 11px 12px;
-  border: 1px solid var(--borderColor);
-  border-radius: 16px;
-  background:
-    linear-gradient(135deg, rgba(74, 107, 255, 0.16), rgba(74, 107, 255, 0.04)),
-    var(--panelBackground);
-  box-shadow: 0 10px 22px var(--shadowColor);
-}
-
-.reviewCopy {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
-.reviewCopy span {
-  font-size: 12px;
-  line-height: 1.35;
-  font-weight: 500;
-  color: var(--textColor);
-}
-
-.reviewStoreButton {
-  width: fit-content;
-  flex-grow: 0;
-  padding: 7px 10px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--accentColor), var(--accentDarker));
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.reviewStoreButton:hover {
-  background: linear-gradient(135deg, var(--accentColor), var(--accentDarker));
-}
-
-.dismissReviewPrompt {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 30px;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--borderColor);
-}
-
-.dismissReviewPrompt svg {
-  width: 14px;
-  height: 14px;
-  stroke: var(--mutedText);
-  stroke-width: 2;
-  stroke-linecap: round;
 }
 
 .sectionEyebrow {
@@ -251,7 +242,7 @@ header h3 {
 
 .volumeValue input {
   background-color: var(--buttonColor);
-  border: 1px solid transparent;
+  border: 1px solid var(--borderColor);
   border-radius: 10px;
   padding: 6px 8px;
   width: 58px;
@@ -343,6 +334,10 @@ input[type="range"]::-webkit-slider-thumb {
   gap: 8px;
 }
 
+.effectsHolder button {
+  border-color: var(--borderColor);
+}
+
 button {
   flex-grow: 1;
   padding: 10px 12px;
@@ -370,9 +365,13 @@ button.selected:hover {
 }
 
 #resetVolume,
-.equalizerToggle,
 .ghostButton {
   width: 100%;
+}
+
+.secondaryAction {
+  margin-top: 3px;
+  border-color: var(--borderColor);
 }
 
 .intensityBlock {
@@ -389,64 +388,10 @@ button.selected:hover {
   padding-inline: 6px;
 }
 
-.equalizerToggleBlock {
+.groupedControl {
   margin-top: 2px;
-  padding-top: 12px;
+  padding-top: 14px;
   border-top: 1px solid var(--borderColor);
-}
-
-.equalizerToggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(135deg, rgba(74, 107, 255, 0.22), rgba(74, 107, 255, 0.08));
-  border-color: var(--borderColor);
-}
-
-.equalizerToggle strong {
-  font-size: 12px;
-  color: #c9d5ff;
-}
-
-.equalizerArrowWrap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 28px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--arrowWrapBg);
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: inset 0 0 0 1px var(--arrowWrapBorder);
-}
-
-.equalizerArrow {
-  width: 14px;
-  height: 14px;
-  stroke: var(--arrowStroke);
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  transition: transform 0.2s ease;
-}
-
-.equalizerArrow.open {
-  transform: rotate(180deg);
-}
-
-.equalizerToggle[aria-expanded="true"] .equalizerArrowWrap {
-  background: var(--arrowWrapBgOpen);
-}
-
-.equalizerPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 14px;
-  border: 1px solid var(--borderColor);
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(74, 107, 255, 0.08), transparent), var(--panelSecondary);
 }
 
 .hidden {
@@ -460,94 +405,155 @@ button.selected:hover {
   gap: 12px;
 }
 
+.eqHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.compactAction {
+  flex: 0 0 auto;
+  padding: 7px 9px;
+  border-color: var(--borderColor);
+  border-radius: 9px;
+  background: transparent;
+  font-size: 9px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.primaryCompactAction {
+  background: linear-gradient(135deg, rgba(74, 107, 255, 0.28), rgba(52, 80, 212, 0.16));
+  color: #dce4ff;
+}
+
 .equalizerDescription {
   font-size: 12px;
   line-height: 1.5;
   color: var(--mutedText);
 }
 
-.eqVisualizer {
-  position: relative;
-  height: 62px;
+.equalizerBoard {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 4px;
+  padding: 14px 8px 12px;
   border: 1px solid var(--borderColor);
   border-radius: 14px;
-  overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0,
-      transparent 15.8%,
-      rgba(255, 255, 255, 0.05) 15.8%,
-      rgba(255, 255, 255, 0.05) 16.4%
-    ),
-    linear-gradient(180deg, rgba(74, 107, 255, 0.08), rgba(74, 107, 255, 0.02));
+    linear-gradient(180deg, rgba(74, 107, 255, 0.09), transparent),
+    var(--panelSecondary);
 }
 
-.eqVisualizer::before {
-  content: "";
-  position: absolute;
-  inset: 50% 0 auto;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+.eqScale {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 154px;
+  margin-top: 35px;
+  padding-block: 1px;
 }
 
-.eqCurveSvg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.eqAreaPath {
-  fill: url(#eqAreaGradient);
-}
-
-.eqLinePath {
-  fill: none;
-  stroke: url(#eqLineGradient);
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 0 8px rgba(74, 107, 255, 0.35));
-}
-
-.eqPointNode {
-  fill: #dfe6ff;
-  stroke: #8ea4ff;
-  stroke-width: 2;
+.eqScale span {
+  font-size: 9px;
+  line-height: 1;
+  color: var(--mutedText);
 }
 
 .eqGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 2px;
 }
 
 .eqBand {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--borderColor);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.eqMeta {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 7px;
+  min-width: 0;
 }
 
-.eqMeta strong {
-  font-size: 12px;
+.eqBand output {
+  min-width: 40px;
+  padding: 4px 3px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--textColor);
 }
 
-.eqMeta span,
-.eqBand small {
+.eqSliderRail {
+  position: relative;
+  display: block;
+  flex: 0 0 154px;
+  width: 20px;
+  height: 154px;
+}
+
+.eqSliderRail::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 7px;
+  width: 6px;
+  border-radius: 999px;
+  background: rgba(74, 107, 255, 0.2);
+}
+
+.eqLevelMeter {
+  position: absolute;
+  z-index: 1;
+  bottom: 0;
+  left: 7px;
+  width: 6px;
+  height: var(--level, 0%);
+  max-height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(0deg, var(--accentDarker), #7890ff 72%, #dce4ff);
+  box-shadow: 0 0 10px rgba(90, 119, 255, 0.65);
+  transition: height 55ms linear;
+}
+
+.eqSliderRail > input.eqSlider {
+  position: absolute;
+  top: 74px;
+  left: -67px;
+  width: 154px;
+  height: 6px;
+  z-index: 2;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  background: transparent;
+}
+
+.eqSliderRail > input.eqSlider::-webkit-slider-thumb {
+  width: 20px;
+  height: 14px;
+  border-radius: 5px;
+  border-width: 2px;
+}
+
+.eqSliderRail > input.eqSlider:focus-visible {
+  outline: 2px solid var(--accentColor);
+  outline-offset: 4px;
+}
+
+.eqBand strong {
   font-size: 11px;
+  white-space: nowrap;
+  color: var(--textColor);
+}
+
+.eqBand small {
+  overflow: hidden;
+  width: 100%;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
   color: var(--mutedText);
 }
 
@@ -609,7 +615,7 @@ h3 span {
 h3 input {
   margin-right: 5px;
   background-color: var(--buttonColor);
-  border: 1px solid transparent;
+  border: 1px solid var(--borderColor);
   border-radius: 10px;
   padding: 6px 8px;
   width: 58px;
@@ -621,6 +627,206 @@ h3 input:hover,
 h3 input:focus {
   background-color: var(--buttonDarker);
   outline: none;
+}
+
+.modalBackdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(5, 8, 16, 0.72);
+  backdrop-filter: blur(7px);
+}
+
+.modalBackdrop.hidden {
+  display: none;
+}
+
+.modalPanel {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--borderColor);
+  border-radius: 18px;
+  background:
+    linear-gradient(160deg, rgba(74, 107, 255, 0.12), transparent 46%),
+    var(--panelBackground);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.5);
+  animation: modalIn 0.18s ease-out;
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(7px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modalTitle {
+  justify-content: flex-start;
+  margin-top: 2px;
+  font-size: 17px;
+}
+
+.modalClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-color: var(--borderColor);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 20px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--mutedText);
+}
+
+.modalDescription {
+  margin-top: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--mutedText);
+}
+
+.presetNameField {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.presetNameField span {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mutedText);
+}
+
+.presetNameField input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--borderColor);
+  border-radius: 11px;
+  outline: none;
+  background: var(--panelSecondary);
+  color: var(--textColor);
+  font-size: 12px;
+}
+
+.presetNameField input:focus {
+  border-color: var(--accentColor);
+  box-shadow: 0 0 0 3px rgba(74, 107, 255, 0.14);
+}
+
+.fieldError {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #ff8795;
+}
+
+.modalActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.modalPrimary {
+  background: linear-gradient(135deg, var(--accentColor), var(--accentDarker));
+  color: white;
+  font-weight: 600;
+}
+
+.presetSlots {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.presetSlot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px;
+  border: 1px solid var(--borderColor);
+  border-radius: 13px;
+  background: var(--panelSecondary);
+  text-align: left;
+}
+
+button.presetSlot:not(:disabled):hover {
+  border-color: rgba(74, 107, 255, 0.42);
+  background: rgba(74, 107, 255, 0.12);
+}
+
+.presetSlotNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgba(74, 107, 255, 0.16);
+  font-size: 11px;
+  font-weight: 700;
+  color: #cbd6ff;
+}
+
+.presetSlotCopy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.presetSlotCopy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.presetSlotCopy small {
+  margin-top: 2px;
+  font-size: 9px;
+  color: var(--mutedText);
+}
+
+.presetSlotAction,
+.presetSlotLock {
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 600;
+  color: #b8c6ff;
+}
+
+.emptyPresetSlot,
+.lockedPresetSlot {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.lockedPresetSlot {
+  border-style: dashed;
 }
 
 @media (prefers-reduced-motion: reduce) {

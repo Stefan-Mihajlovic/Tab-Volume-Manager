@@ -17,143 +17,153 @@
         </label>
       </header>
 
-      <section id="reviewPrompt" class="reviewPrompt hidden" aria-live="polite">
-        <div class="reviewCopy">
-          <span>If you like the extension, make sure to leave a review!</span>
-          <button id="reviewStoreButton" class="reviewStoreButton">Rate on Chrome Web Store</button>
-        </div>
-        <button id="dismissReviewPrompt" class="dismissReviewPrompt" aria-label="Dismiss review message">
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M4 4l8 8M12 4l-8 8" />
-          </svg>
+      <nav class="tabNavigation" role="tablist" aria-label="Audio controls">
+        <button id="volumeTab" class="tabButton selected" type="button" role="tab" aria-selected="true" aria-controls="volumePanel" data-tab="volume">
+          Volume
         </button>
-      </section>
+        <button id="effectsTab" class="tabButton" type="button" role="tab" aria-selected="false" aria-controls="effectsPanel" data-tab="effects" tabindex="-1">
+          Effects
+        </button>
+        <button id="equalizerTab" class="tabButton" type="button" role="tab" aria-selected="false" aria-controls="equalizerPanel" data-tab="equalizer" tabindex="-1">
+          Equalizer
+        </button>
+      </nav>
 
-      <section class="controlCard">
-        <div class="sectionHeading volumeHeading">
-          <div>
-            <span class="sectionEyebrow">Current tab</span>
-            <h3 class="sectionTitle">Website volume</h3>
-          </div>
-          <div id="siteIdentity" class="siteIdentity">
-            <img id="siteFavicon" src="icons/icon32.png" alt="">
-            <span id="siteName">Current website</span>
-          </div>
-        </div>
-        <div class="intensityBlock volumeBlock">
-          <h3>Volume<span id="volumePC" class="volumeValue"><input type="number" min="0" max="500" value="100" placeholder="100">%</span></h3>
-          <div class="sliderInset">
-            <input type="range" id="volumeSlider" min="0" max="500" value="100">
-          </div>
-        </div>
-      </section>
-
-      <section class="controlCard">
-        <div class="sectionHeading">
-          <div>
-            <span class="sectionEyebrow">Quick effects</span>
-            <h3 class="sectionTitle">Sound profile</h3>
-          </div>
-          <div class="profileOrb" aria-hidden="true">
-            <span class="profileGlow"></span>
-            <span class="profileRing profileRingOne"></span>
-            <span class="profileRing profileRingTwo"></span>
-            <span class="profileCore"></span>
-          </div>
-        </div>
-        <section class="effectsHolder">
-          <button id="effectsOff" class="selected">Effects Off</button>
-          <button id="bassBoost">Bass Boost</button>
-          <button id="voiceBoost">Voice Clarity</button>
-        </section>
-        <button id="resetVolume">Reset volume to 100%</button>
-      </section>
-
-      <section class="controlCard eqCard">
-        <div class="intensityBlock">
-          <h3>Effect Intensity<span id="effectIntensityPC"><input type="number" min="0" max="100" value="50" placeholder="10">%</span></h3>
-          <div class="sliderInset">
-            <input type="range" id="effectSlider" min="0" max="20" value="10">
-          </div>
-        </div>
-
-        <div class="equalizerToggleBlock">
-          <button id="toggleEqualizer" class="equalizerToggle" aria-expanded="false" aria-controls="equalizerPanel">
-            <span>Detailed equalizer</span>
-            <span class="equalizerArrowWrap" aria-hidden="true">
-              <svg id="equalizerArrow" class="equalizerArrow" viewBox="0 0 20 20" fill="none">
-                <path d="M5 8l5 5 5-5" />
-              </svg>
-            </span>
-          </button>
-        </div>
-
-        <section id="equalizerPanel" class="equalizerPanel hidden" aria-hidden="true">
-          <div class="equalizerPanelHeader">
-            <div>
-              <span class="sectionEyebrow">Detailed control</span>
-              <h3 class="sectionTitle">Equalizer</h3>
+      <main class="tabContent">
+        <section id="volumePanel" class="tabPanel" role="tabpanel" aria-labelledby="volumeTab" data-panel="volume">
+          <section class="controlCard">
+            <div class="sectionHeading volumeHeading">
+              <div>
+                <span class="sectionEyebrow">Current tab</span>
+                <h3 class="sectionTitle">Website volume</h3>
+              </div>
+              <div id="siteIdentity" class="siteIdentity">
+                <img id="siteFavicon" src="icons/icon32.png" alt="">
+                <span id="siteName">Current website</span>
+              </div>
             </div>
-            <button id="resetEqualizer" class="ghostButton">Reset EQ</button>
+            <div class="intensityBlock volumeBlock">
+              <h3>Volume<span id="volumePC" class="volumeValue"><input type="number" min="0" max="500" value="100" placeholder="100">%</span></h3>
+              <div class="sliderInset">
+                <input type="range" id="volumeSlider" min="0" max="500" value="100">
+              </div>
+            </div>
+            <button id="resetVolume" class="secondaryAction">Reset volume to 100%</button>
+          </section>
+        </section>
+
+        <section id="effectsPanel" class="tabPanel hidden" role="tabpanel" aria-labelledby="effectsTab" data-panel="effects">
+          <section class="controlCard">
+            <div class="sectionHeading">
+              <div>
+                <span class="sectionEyebrow">Quick effects</span>
+                <h3 class="sectionTitle">Sound profile</h3>
+              </div>
+              <div class="profileOrb" aria-hidden="true">
+                <span class="profileGlow"></span>
+                <span class="profileRing profileRingOne"></span>
+                <span class="profileRing profileRingTwo"></span>
+                <span class="profileCore"></span>
+              </div>
+            </div>
+            <section class="effectsHolder">
+              <button id="effectsOff" class="selected">Effects Off</button>
+              <button id="bassBoost">Bass Boost</button>
+              <button id="voiceBoost">Voice Clarity</button>
+            </section>
+            <div class="intensityBlock groupedControl">
+              <h3>Effect Intensity<span id="effectIntensityPC"><input type="number" min="0" max="100" value="50" placeholder="10">%</span></h3>
+              <div class="sliderInset">
+                <input type="range" id="effectSlider" min="0" max="20" value="10">
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section id="equalizerPanel" class="tabPanel hidden" role="tabpanel" aria-labelledby="equalizerTab" data-panel="equalizer">
+          <section class="controlCard eqCard">
+            <div class="equalizerPanelHeader">
+              <div>
+                <span id="presetStatus" class="sectionEyebrow">No preset loaded</span>
+                <h3 class="sectionTitle">Equalizer</h3>
+              </div>
+              <div class="eqHeaderActions">
+                <button id="savePresetButton" class="compactAction" type="button">Save Preset</button>
+                <button id="loadPresetButton" class="compactAction primaryCompactAction" type="button">Load Preset</button>
+              </div>
+            </div>
+
+            <div class="equalizerBoard">
+              <div class="eqScale" aria-hidden="true">
+                <span>+12</span>
+                <span>0</span>
+                <span>-12</span>
+              </div>
+              <div class="eqGrid">
+                <label class="eqBand"><output id="eqValue0">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="0" min="-12" max="12" value="0" aria-label="Sub Bass, 32 Hz"></span><strong>32 Hz</strong><small>Sub Bass</small></label>
+                <label class="eqBand"><output id="eqValue1">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="1" min="-12" max="12" value="0" aria-label="Bass, 64 Hz"></span><strong>64 Hz</strong><small>Bass</small></label>
+                <label class="eqBand"><output id="eqValue2">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="2" min="-12" max="12" value="0" aria-label="Low Mid, 250 Hz"></span><strong>250 Hz</strong><small>Low Mid</small></label>
+                <label class="eqBand"><output id="eqValue3">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="3" min="-12" max="12" value="0" aria-label="Presence, 1 kHz"></span><strong>1 kHz</strong><small>Presence</small></label>
+                <label class="eqBand"><output id="eqValue4">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="4" min="-12" max="12" value="0" aria-label="Clarity, 4 kHz"></span><strong>4 kHz</strong><small>Clarity</small></label>
+                <label class="eqBand"><output id="eqValue5">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="5" min="-12" max="12" value="0" aria-label="Air, 8 kHz"></span><strong>8 kHz</strong><small>Air</small></label>
+              </div>
+            </div>
+            <button id="resetEqualizer" class="secondaryAction">Reset EQ</button>
+          </section>
+        </section>
+      </main>
+
+      <div id="savePresetModal" class="modalBackdrop hidden" role="dialog" aria-modal="true" aria-labelledby="savePresetTitle">
+        <section class="modalPanel">
+          <div class="modalHeader">
+            <div>
+              <span class="sectionEyebrow">Preset slot 1</span>
+              <h3 id="savePresetTitle" class="modalTitle">Save EQ preset</h3>
+            </div>
+            <button class="modalClose" type="button" data-close-modal="savePresetModal" aria-label="Close save preset dialog">&times;</button>
           </div>
-
-          <p class="equalizerDescription">
-            Fine tune every band for the current website. Quick effects stay active and combine with these EQ adjustments.
-          </p>
-
-          <div class="eqVisualizer" aria-hidden="true">
-            <svg id="eqCurveSvg" class="eqCurveSvg" viewBox="0 0 320 62" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="eqAreaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="#7b95ff" stop-opacity="0.38" />
-                  <stop offset="100%" stop-color="#7b95ff" stop-opacity="0.02" />
-                </linearGradient>
-                <linearGradient id="eqLineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#a5b8ff" />
-                  <stop offset="50%" stop-color="#6b86ff" />
-                  <stop offset="100%" stop-color="#d5ddff" />
-                </linearGradient>
-              </defs>
-              <path id="eqAreaPath" class="eqAreaPath"></path>
-              <path id="eqLinePath" class="eqLinePath"></path>
-              <g id="eqPoints"></g>
-            </svg>
-          </div>
-
-          <div class="eqGrid">
-            <label class="eqBand">
-              <span class="eqMeta"><strong>Sub Bass</strong><span id="eqValue0">0 dB</span></span>
-              <input type="range" class="eqSlider" data-band="0" min="-12" max="12" value="0">
-              <small>32 Hz</small>
-            </label>
-            <label class="eqBand">
-              <span class="eqMeta"><strong>Bass</strong><span id="eqValue1">0 dB</span></span>
-              <input type="range" class="eqSlider" data-band="1" min="-12" max="12" value="0">
-              <small>64 Hz</small>
-            </label>
-            <label class="eqBand">
-              <span class="eqMeta"><strong>Low Mid</strong><span id="eqValue2">0 dB</span></span>
-              <input type="range" class="eqSlider" data-band="2" min="-12" max="12" value="0">
-              <small>250 Hz</small>
-            </label>
-            <label class="eqBand">
-              <span class="eqMeta"><strong>Presence</strong><span id="eqValue3">0 dB</span></span>
-              <input type="range" class="eqSlider" data-band="3" min="-12" max="12" value="0">
-              <small>1 kHz</small>
-            </label>
-            <label class="eqBand">
-              <span class="eqMeta"><strong>Clarity</strong><span id="eqValue4">0 dB</span></span>
-              <input type="range" class="eqSlider" data-band="4" min="-12" max="12" value="0">
-              <small>4 kHz</small>
-            </label>
-            <label class="eqBand">
-              <span class="eqMeta"><strong>Air</strong><span id="eqValue5">0 dB</span></span>
-              <input type="range" class="eqSlider" data-band="5" min="-12" max="12" value="0">
-              <small>8 kHz</small>
-            </label>
+          <p class="modalDescription">Save the current six-band equalizer settings.</p>
+          <label class="presetNameField" for="presetNameInput">
+            <span>Preset name</span>
+            <input id="presetNameInput" type="text" maxlength="32" autocomplete="off" placeholder="e.g. My Headphones">
+          </label>
+          <p id="presetNameError" class="fieldError hidden">Enter a preset name.</p>
+          <div class="modalActions">
+            <button type="button" data-close-modal="savePresetModal">Cancel</button>
+            <button id="confirmSavePreset" class="modalPrimary" type="button">Save Preset</button>
           </div>
         </section>
-      </section>
+      </div>
+
+      <div id="loadPresetModal" class="modalBackdrop hidden" role="dialog" aria-modal="true" aria-labelledby="loadPresetTitle">
+        <section class="modalPanel">
+          <div class="modalHeader">
+            <div>
+              <span class="sectionEyebrow">Your presets</span>
+              <h3 id="loadPresetTitle" class="modalTitle">Load EQ preset</h3>
+            </div>
+            <button class="modalClose" type="button" data-close-modal="loadPresetModal" aria-label="Close load preset dialog">&times;</button>
+          </div>
+          <div class="presetSlots">
+            <button id="savedPresetSlot" class="presetSlot" type="button">
+              <span class="presetSlotNumber">1</span>
+              <span class="presetSlotCopy">
+                <strong id="savedPresetName">Empty preset slot</strong>
+                <small id="savedPresetSummary">Save an EQ preset first</small>
+              </span>
+              <span class="presetSlotAction">Load</span>
+            </button>
+            <div class="presetSlot lockedPresetSlot" aria-disabled="true">
+              <span class="presetSlotNumber">2</span>
+              <span class="presetSlotCopy">
+                <strong>More preset slots</strong>
+                <small>Coming soon</small>
+              </span>
+              <span class="presetSlotLock" aria-hidden="true">&#128274;</span>
+            </div>
+          </div>
+        </section>
+      </div>
 
       <script src="popup.js"></script>
     </div>
