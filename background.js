@@ -3,6 +3,7 @@ const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 let creatingOffscreenDocument = null;
 const tabTasks = new Map();
 const meterSubscribers = new Map();
+const latestMeterLevels = new Map();
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "ZAZ_METER") return;
@@ -32,7 +33,13 @@ chrome.runtime.onConnect.addListener((port) => {
 });
 
 chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "ZAZ_GET_EQ_LEVELS" && Number.isInteger(message.tabId)) {
+    return false;
+  }
+
   if (message?.type !== "ZAZ_EQ_LEVELS" || message.target !== "background") return false;
+
+  latestMeterLevels.set(message.tabId, message);
 
   meterSubscribers.get(message.tabId)?.forEach((port) => {
     try {
@@ -42,6 +49,12 @@ chrome.runtime.onMessage.addListener((message) => {
     }
   });
 
+  return false;
+});
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type !== "ZAZ_GET_EQ_LEVELS" || !Number.isInteger(message.tabId)) return false;
+  sendResponse(latestMeterLevels.get(message.tabId) || null);
   return false;
 });
 
@@ -120,6 +133,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabTasks.delete(tabId);
   meterSubscribers.delete(tabId);
+  latestMeterLevels.delete(tabId);
   chrome.runtime.sendMessage({
     type: "ZAZ_OFFSCREEN_STOP",
     target: "offscreen",

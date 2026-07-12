@@ -38,9 +38,11 @@ function applySettings(session, settings = {}) {
   const now = session.context.currentTime;
 
   session.gain.gain.setTargetAtTime(volume / 100, now, 0.015);
+  session.effectBass.gain.setTargetAtTime(mode === "bass" ? amount : 0, now, 0.015);
+  session.effectVoice.gain.setTargetAtTime(mode === "voice" ? amount : 0, now, 0.015);
   session.visualBandDb = [];
   session.filters.forEach((filter, index) => {
-    const manual = Math.max(-12, Math.min(12, Number(bands[index]) || 0));
+    const manual = Math.max(-15, Math.min(15, Number(bands[index]) || 0));
     const totalGainDb = manual + curve[index];
     filter.gain.setTargetAtTime(totalGainDb, now, 0.015);
     session.visualBandDb[index] = totalGainDb;
@@ -61,8 +63,18 @@ async function createSession(tabId, streamId, settings) {
   const context = new AudioContext();
   const source = context.createMediaStreamSource(stream);
   const analyser = context.createAnalyser();
+  const effectBass = context.createBiquadFilter();
+  const effectVoice = context.createBiquadFilter();
   const filters = EQ_FREQUENCIES.map((_, index) => createFilter(context, index));
   const gain = context.createGain();
+
+  effectBass.type = "lowshelf";
+  effectBass.frequency.value = 180;
+  effectBass.gain.value = 0;
+  effectVoice.type = "peaking";
+  effectVoice.frequency.value = 2200;
+  effectVoice.Q.value = 1.1;
+  effectVoice.gain.value = 0;
 
   analyser.fftSize = 4096;
   analyser.smoothingTimeConstant = 0.42;
@@ -70,7 +82,9 @@ async function createSession(tabId, streamId, settings) {
   analyser.maxDecibels = -10;
 
   source.connect(analyser);
-  let current = analyser;
+  analyser.connect(effectBass);
+  effectBass.connect(effectVoice);
+  let current = effectVoice;
   filters.forEach((filter) => {
     current.connect(filter);
     current = filter;
@@ -88,6 +102,8 @@ async function createSession(tabId, streamId, settings) {
     previousFrequencyData: new Uint8Array(analyser.frequencyBinCount),
     displayedLevels: [0, 0, 0, 0, 0, 0],
     staleSpectrumFrames: 0,
+    effectBass,
+    effectVoice,
     filters,
     gain,
     visualBandDb: [0, 0, 0, 0, 0, 0],
@@ -173,12 +189,19 @@ function startMeter(tabId, session) {
   session.meterTimer = setInterval(() => {
     if (sessions.get(tabId) !== session) return;
 
-    chrome.runtime.sendMessage({
-      type: "ZAZ_EQ_LEVELS",
-      target: "background",
-      tabId,
-      levels: readBandLevels(session),
-    }).catch(() => {});
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: "ZAZ_EQ_LEVELS",
+          target: "background",
+          tabId,
+          levels: readBandLevels(session),
+        },
+        () => void chrome.runtime.lastError
+      );
+    } catch (error) {
+      // The background worker may be restarting between meter frames.
+    }
   }, METER_INTERVAL_MS);
 }
 

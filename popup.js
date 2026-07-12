@@ -37,6 +37,7 @@ let effectAmount = 10;
 let eqBands = [...EQ_DEFAULTS];
 let savedEqPreset = null;
 let loadedPresetName = null;
+let lastMeterUpdateAt = 0;
 
 function applyTheme(theme) {
   const isLight = theme === "light";
@@ -116,8 +117,19 @@ function setupTabs() {
 
 function updatePresetStatus() {
   presetStatus.textContent = loadedPresetName
-    ? `Preset “${loadedPresetName}”`
+    ? `Preset "${loadedPresetName}"`
     : "No preset loaded";
+}
+
+function applyMeterLevels(message) {
+  if (message?.type !== "ZAZ_EQ_LEVELS" || message.tabId !== activeTabId) return;
+  if (!Array.isArray(message.levels) || message.levels.length !== eqLevelMeters.length) return;
+
+  lastMeterUpdateAt = Date.now();
+  eqLevelMeters.forEach((meter, index) => {
+    const level = Math.max(0, Math.min(100, Number(message.levels[index]) || 0));
+    meter.style.setProperty("--level", `${level}%`);
+  });
 }
 
 function clearLoadedPreset() {
@@ -154,7 +166,7 @@ function setupPresetControls() {
     ) {
       savedEqPreset = {
         name: preset.name,
-        eqBands: preset.eqBands.map((band) => Math.max(-12, Math.min(12, Number(band) || 0))),
+        eqBands: preset.eqBands.map((band) => Math.max(-15, Math.min(15, Number(band) || 0))),
       };
     }
     updateSavedPresetSlot();
@@ -431,15 +443,19 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
   });
 });
 
-meterPort.onMessage.addListener((message) => {
-  if (message?.type !== "ZAZ_EQ_LEVELS" || message.tabId !== activeTabId) return;
-  if (!Array.isArray(message.levels) || message.levels.length !== eqLevelMeters.length) return;
+meterPort.onMessage.addListener(applyMeterLevels);
 
-  eqLevelMeters.forEach((meter, index) => {
-    const level = Math.max(0, Math.min(100, Number(message.levels[index]) || 0));
-    meter.style.setProperty("--level", `${level}%`);
-  });
-});
+setInterval(() => {
+  if (!Number.isInteger(activeTabId) || Date.now() - lastMeterUpdateAt < 300) return;
+
+  chrome.runtime.sendMessage(
+    { type: "ZAZ_GET_EQ_LEVELS", tabId: activeTabId },
+    (message) => {
+      if (chrome.runtime.lastError || !message) return;
+      applyMeterLevels(message);
+    }
+  );
+}, 200);
 
 volumePC.addEventListener("input", (e) => {
   const value = Math.max(0, Math.min(500, parseInt(e.target.value || "0", 10)));
