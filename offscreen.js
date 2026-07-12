@@ -4,6 +4,7 @@ const sessions = new Map();
 const METER_INTERVAL_MS = 50;
 const METER_FLOOR_DB = -72;
 const METER_CEILING_DB = -14;
+const BASS_EFFECT_MULTIPLIER = 1.5;
 
 function createFilter(context, index) {
   const filter = context.createBiquadFilter();
@@ -19,7 +20,15 @@ function createFilter(context, index) {
 
 function effectCurve(mode, amount) {
   if (mode === "bass") {
-    return [amount, amount * 0.55, amount * 0.2, 0, -amount * 0.15, -amount * 0.1];
+    const boostedAmount = amount * BASS_EFFECT_MULTIPLIER;
+    return [
+      boostedAmount,
+      boostedAmount * 0.55,
+      boostedAmount * 0.2,
+      0,
+      -boostedAmount * 0.15,
+      -boostedAmount * 0.1,
+    ];
   }
   if (mode === "voice") {
     return [-amount * 0.15, -amount * 0.1, amount * 0.25, amount * 0.55, amount * 0.85, amount * 0.2];
@@ -38,7 +47,11 @@ function applySettings(session, settings = {}) {
   const now = session.context.currentTime;
 
   session.gain.gain.setTargetAtTime(volume / 100, now, 0.015);
-  session.effectBass.gain.setTargetAtTime(mode === "bass" ? amount : 0, now, 0.015);
+  session.effectBass.gain.setTargetAtTime(
+    mode === "bass" ? amount * BASS_EFFECT_MULTIPLIER : 0,
+    now,
+    0.015
+  );
   session.effectVoice.gain.setTargetAtTime(mode === "voice" ? amount : 0, now, 0.015);
   session.visualBandDb = [];
   session.filters.forEach((filter, index) => {

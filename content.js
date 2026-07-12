@@ -3,6 +3,7 @@
 
   const EQ_FREQUENCIES = [32, 64, 250, 1000, 4000, 8000];
   const EQ_Q_VALUES = [0.8, 1, 1, 1.1, 1.2, 0.8];
+  const BASS_EFFECT_MULTIPLIER = 1.5;
 
   window.__zazVolumeManager = {
     gain: 1,
@@ -66,7 +67,15 @@
 
   function getEffectCurve(mode, amount) {
     if (mode === "bass") {
-      return [amount, amount * 0.55, amount * 0.2, 0, -amount * 0.15, -amount * 0.1];
+      const boostedAmount = amount * BASS_EFFECT_MULTIPLIER;
+      return [
+        boostedAmount,
+        boostedAmount * 0.55,
+        boostedAmount * 0.2,
+        0,
+        -boostedAmount * 0.15,
+        -boostedAmount * 0.1,
+      ];
     }
 
     if (mode === "voice") {
@@ -84,7 +93,9 @@
       if (!nodes) return;
 
       nodes.gain.gain.value = manager.gain;
-      nodes.effectBass.gain.value = manager.effectMode === "bass" ? manager.effectAmount : 0;
+      nodes.effectBass.gain.value = manager.effectMode === "bass"
+        ? manager.effectAmount * BASS_EFFECT_MULTIPLIER
+        : 0;
       nodes.effectVoice.gain.value = manager.effectMode === "voice" ? manager.effectAmount : 0;
 
       nodes.eqFilters.forEach((filter, index) => {
