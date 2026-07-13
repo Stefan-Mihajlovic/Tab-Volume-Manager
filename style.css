@@ -1065,6 +1065,12 @@ button.presetSlot:not(:disabled):hover {
   gap: 7px;
 }
 
+#proMarketingContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .proFeature {
   display: flex;
   align-items: center;
@@ -1124,6 +1130,7 @@ button.presetSlot:not(:disabled):hover {
   grid-template-columns: repeat(3, 1fr);
   gap: 7px;
   align-items: stretch;
+  padding-top: 5px;
 }
 
 .proPricing > div {
