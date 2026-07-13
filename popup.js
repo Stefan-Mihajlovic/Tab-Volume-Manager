@@ -25,9 +25,31 @@ const confirmSavePreset = document.getElementById("confirmSavePreset");
 const savedPresetSlot = document.getElementById("savedPresetSlot");
 const savedPresetName = document.getElementById("savedPresetName");
 const savedPresetSummary = document.getElementById("savedPresetSummary");
+const proStatusBadge = document.getElementById("proStatusBadge");
+const proActivationState = document.getElementById("proActivationState");
+const proActiveState = document.getElementById("proActiveState");
+const proLicenseKeyInput = document.getElementById("proLicenseKeyInput");
+const proLicenseMessage = document.getElementById("proLicenseMessage");
+const proLicenseSummary = document.getElementById("proLicenseSummary");
+const activateProButton = document.getElementById("activateProButton");
+const getProButton = document.getElementById("getProButton");
+const manageProButton = document.getElementById("manageProButton");
+const deactivateProButton = document.getElementById("deactivateProButton");
 const EQ_DEFAULTS = [0, 0, 0, 0, 0, 0];
 const ACTIVE_TAB_KEY = "activeControlTab";
 const SAVED_EQ_PRESET_KEY = "savedEqPreset";
+const TVM_LICENSE_KEY = "tvmProLicenseKey";
+const TVM_INSTALLATION_ID_KEY = "tvmProInstallationId";
+const TVM_ENTITLEMENT_KEY = "tvmProEntitlement";
+const TVM_LICENSE_META_KEY = "tvmProLicenseMeta";
+const TVM_API_URL = "https://tvm-licensing-api.optiflowzoffice.workers.dev";
+const TVM_PRO_URL = "https://stefanmihajlovic.com/tab-volume-manager/#pro";
+const TVM_LICENSE_PUBLIC_JWK = {
+  kty: "EC",
+  x: "8Fd8yVpXuwL877LWa4AJv4gYG-km1QeQfH21XDgyp9Q",
+  y: "M74OitFNOHGF8jxQpXyEEZJ5Z5BcHGcxxB4ykIet7r8",
+  crv: "P-256",
+};
 const meterPort = chrome.runtime.connect({ name: "ZAZ_METER" });
 
 let activeHostname = null;
@@ -38,6 +60,255 @@ let eqBands = [...EQ_DEFAULTS];
 let savedEqPreset = null;
 let loadedPresetName = null;
 let lastMeterUpdateAt = 0;
+
+function storageGet(keys) {
+  return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
+}
+
+function storageSet(values) {
+  return new Promise((resolve) => chrome.storage.local.set(values, resolve));
+}
+
+function storageRemove(keys) {
+  return new Promise((resolve) => chrome.storage.local.remove(keys, resolve));
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function base64UrlToBytes(value) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+async function installationClaim(installationId) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(installationId));
+  return bytesToHex(new Uint8Array(digest));
+}
+
+async function verifyEntitlement(entitlement, installationId) {
+  if (!entitlement?.token || typeof entitlement.expiresAt !== "number") return false;
+  const parts = entitlement.token.split(".");
+  if (parts.length !== 3) return false;
+
+  try {
+    const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[1])));
+    const expectedInstallation = await installationClaim(installationId);
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp <= now || entitlement.expiresAt <= now) return false;
+    if (payload.installation !== expectedInstallation) return false;
+
+    const publicKey = await crypto.subtle.importKey(
+      "jwk",
+      TVM_LICENSE_PUBLIC_JWK,
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["verify"]
+    );
+    return crypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" },
+      publicKey,
+      base64UrlToBytes(parts[2]),
+      new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
+    );
+  } catch (error) {
+    return false;
+  }
+}
+
+async function postLicenseApi(path, body) {
+  const response = await fetch(`${TVM_API_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data.error?.message || "Could not contact the license server.");
+    error.code = data.error?.code || "request_failed";
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
+async function ensureInstallationId() {
+  const stored = await storageGet(TVM_INSTALLATION_ID_KEY);
+  if (typeof stored[TVM_INSTALLATION_ID_KEY] === "string" &&
+      stored[TVM_INSTALLATION_ID_KEY].length >= 16) {
+    return stored[TVM_INSTALLATION_ID_KEY];
+  }
+  const installationId = crypto.randomUUID();
+  await storageSet({ [TVM_INSTALLATION_ID_KEY]: installationId });
+  return installationId;
+}
+
+function setProMessage(message = "", success = false) {
+  proLicenseMessage.textContent = message;
+  proLicenseMessage.classList.toggle("success", success);
+}
+
+function setProUiActive(license, offline = false) {
+  proActivationState.classList.add("hidden");
+  proActiveState.classList.remove("hidden");
+  proStatusBadge.textContent = "✦ Pro active";
+  const planName = license?.plan
+    ? `${license.plan.charAt(0).toUpperCase()}${license.plan.slice(1)}`
+    : "Pro";
+  const suffix = license?.lastFour ? ` •••• ${license.lastFour}` : "";
+  proLicenseSummary.textContent = `${planName} license${suffix} is active on this installation.`;
+  setProMessage(offline ? "Offline verification active. We will sync again when online." : "License verified.", true);
+}
+
+function setProUiInactive(message = "") {
+  proActiveState.classList.add("hidden");
+  proActivationState.classList.remove("hidden");
+  proStatusBadge.textContent = "✦ Pro access";
+  setProMessage(message);
+}
+
+function setProButtonsDisabled(disabled) {
+  [activateProButton, getProButton, manageProButton, deactivateProButton]
+    .forEach((button) => { button.disabled = disabled; });
+}
+
+async function storeProAccess(licenseKey, result) {
+  await storageSet({
+    [TVM_LICENSE_KEY]: licenseKey,
+    [TVM_ENTITLEMENT_KEY]: result.entitlement,
+    [TVM_LICENSE_META_KEY]: result.license,
+  });
+}
+
+async function activateProLicense() {
+  const licenseKey = proLicenseKeyInput.value.trim().toUpperCase();
+  if (!/^TVM(?:-[A-Z0-9]{5}){5}$/.test(licenseKey)) {
+    setProMessage("Enter a valid TVM license key.");
+    proLicenseKeyInput.focus();
+    return;
+  }
+
+  setProButtonsDisabled(true);
+  setProMessage("Activating this installation…");
+  try {
+    const installationId = await ensureInstallationId();
+    const result = await postLicenseApi("/v1/license/activate", {
+      licenseKey,
+      installationId,
+      extensionVersion: chrome.runtime.getManifest().version,
+    });
+    if (!await verifyEntitlement(result.entitlement, installationId)) {
+      throw new Error("The license server returned an invalid entitlement.");
+    }
+    await storeProAccess(licenseKey, result);
+    setProUiActive(result.license);
+  } catch (error) {
+    const messages = {
+      license_not_found: "That license key could not be found.",
+      license_inactive: "This license is not currently active.",
+      activation_limit_reached: "This license is already active on three installations.",
+    };
+    setProMessage(messages[error.code] || error.message);
+  } finally {
+    setProButtonsDisabled(false);
+  }
+}
+
+async function validateStoredProLicense() {
+  const stored = await storageGet([
+    TVM_LICENSE_KEY,
+    TVM_INSTALLATION_ID_KEY,
+    TVM_ENTITLEMENT_KEY,
+    TVM_LICENSE_META_KEY,
+  ]);
+  const licenseKey = stored[TVM_LICENSE_KEY];
+  if (typeof licenseKey !== "string") {
+    setProUiInactive();
+    return;
+  }
+
+  proLicenseKeyInput.value = licenseKey;
+  const installationId = await ensureInstallationId();
+  try {
+    const result = await postLicenseApi("/v1/license/validate", {
+      licenseKey,
+      installationId,
+      extensionVersion: chrome.runtime.getManifest().version,
+    });
+    if (!await verifyEntitlement(result.entitlement, installationId)) {
+      throw new Error("The license server returned an invalid entitlement.");
+    }
+    await storeProAccess(licenseKey, result);
+    setProUiActive(result.license);
+  } catch (error) {
+    const cachedIsValid = await verifyEntitlement(stored[TVM_ENTITLEMENT_KEY], installationId);
+    if ((!error.status || error.status >= 500) && cachedIsValid) {
+      setProUiActive(stored[TVM_LICENSE_META_KEY], true);
+      return;
+    }
+    await storageRemove([TVM_LICENSE_KEY, TVM_ENTITLEMENT_KEY, TVM_LICENSE_META_KEY]);
+    const message = error.code === "license_inactive"
+      ? "Your Pro license is no longer active."
+      : error.code === "installation_not_activated"
+        ? "This installation needs to be activated again."
+        : "Could not verify the saved license.";
+    setProUiInactive(message);
+  }
+}
+
+async function manageProBilling() {
+  setProButtonsDisabled(true);
+  setProMessage("Opening secure Stripe billing…");
+  try {
+    const stored = await storageGet(TVM_LICENSE_KEY);
+    const result = await postLicenseApi("/v1/billing/portal", {
+      licenseKey: stored[TVM_LICENSE_KEY],
+    });
+    await chrome.tabs.create({ url: result.url });
+  } catch (error) {
+    setProMessage(error.message);
+  } finally {
+    setProButtonsDisabled(false);
+  }
+}
+
+async function deactivateProLicense() {
+  setProButtonsDisabled(true);
+  setProMessage("Deactivating this installation…");
+  try {
+    const stored = await storageGet([TVM_LICENSE_KEY, TVM_INSTALLATION_ID_KEY]);
+    await postLicenseApi("/v1/license/deactivate", {
+      licenseKey: stored[TVM_LICENSE_KEY],
+      installationId: stored[TVM_INSTALLATION_ID_KEY],
+    });
+    await storageRemove([TVM_LICENSE_KEY, TVM_ENTITLEMENT_KEY, TVM_LICENSE_META_KEY]);
+    proLicenseKeyInput.value = "";
+    setProUiInactive("This installation was deactivated. The slot is free again.");
+    setProMessage("This installation was deactivated. The slot is free again.", true);
+  } catch (error) {
+    setProMessage(error.message);
+  } finally {
+    setProButtonsDisabled(false);
+  }
+}
+
+function setupProLicensing() {
+  proLicenseKeyInput.addEventListener("input", () => {
+    proLicenseKeyInput.value = proLicenseKeyInput.value.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+    setProMessage();
+  });
+  proLicenseKeyInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") activateProLicense();
+  });
+  activateProButton.addEventListener("click", activateProLicense);
+  getProButton.addEventListener("click", () => chrome.tabs.create({ url: TVM_PRO_URL }));
+  manageProButton.addEventListener("click", manageProBilling);
+  deactivateProButton.addEventListener("click", deactivateProLicense);
+  validateStoredProLicense();
+}
 
 function applyTheme(theme) {
   const isLight = theme === "light";
@@ -538,4 +809,5 @@ syncEqualizerUI();
 highlightSelectedButton(effectMode);
 setupTabs();
 setupPresetControls();
+setupProLicensing();
 updatePresetStatus();

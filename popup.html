@@ -119,7 +119,7 @@
         <section id="proPanel" class="tabPanel hidden" role="tabpanel" aria-labelledby="proTab" data-panel="pro">
           <section class="controlCard proCard">
             <div class="proHero">
-              <span class="proComingBadge"><span aria-hidden="true">&#10022;</span> Pro coming soon</span>
+              <span class="proComingBadge" id="proStatusBadge"><span aria-hidden="true">&#10022;</span> Pro access</span>
               <h2>More control. Better sound.</h2>
               <p>Advanced audio tools for movies, music, gaming and every tab you open.</p>
               <div class="proOrb" aria-hidden="true">
@@ -156,13 +156,47 @@
 
             <p class="proMoreFeatures">Plus stereo balance, mono audio, shortcuts, sleep timer, cloud sync and automatic site profiles.</p>
 
-            <div class="proPricing" aria-label="Planned Pro pricing">
+            <div class="proPricing" aria-label="Pro pricing">
               <div><strong>$2.49</strong><small>Monthly</small></div>
               <div class="featuredPrice"><span>Best value</span><strong>$14.99</strong><small>Yearly</small></div>
               <div><strong>$29.99</strong><small>Lifetime</small></div>
             </div>
 
-            <button class="proComingButton" type="button" disabled>Pro is coming soon</button>
+            <section class="proLicensePanel" aria-label="Pro license">
+              <div id="proActivationState">
+                <div class="proLicenseHeading">
+                  <div>
+                    <strong>Activate Pro</strong>
+                    <small>Already purchased? Enter your license key.</small>
+                  </div>
+                  <span class="proLicenseStatus">Free</span>
+                </div>
+                <label class="proLicenseField" for="proLicenseKeyInput">
+                  <span>License key</span>
+                  <input id="proLicenseKeyInput" type="text" autocomplete="off" spellcheck="false" placeholder="TVM-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX">
+                </label>
+                <div class="proLicenseActions">
+                  <button id="activateProButton" class="proPrimaryButton" type="button">Activate Pro</button>
+                  <button id="getProButton" type="button">Get Pro</button>
+                </div>
+              </div>
+
+              <div id="proActiveState" class="hidden">
+                <div class="proLicenseHeading">
+                  <div>
+                    <strong>Pro is active</strong>
+                    <small id="proLicenseSummary">Your license is connected to this installation.</small>
+                  </div>
+                  <span class="proLicenseStatus active">Active</span>
+                </div>
+                <div class="proLicenseActions">
+                  <button id="manageProButton" class="proPrimaryButton" type="button">Manage billing</button>
+                  <button id="deactivateProButton" type="button">Deactivate here</button>
+                </div>
+              </div>
+
+              <p id="proLicenseMessage" class="proLicenseMessage" role="status"></p>
+            </section>
           </section>
         </section>
       </main>

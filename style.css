@@ -1075,20 +1075,127 @@ button.presetSlot:not(:disabled):hover {
   text-transform: uppercase;
 }
 
-.proComingButton,
-.proComingButton:disabled {
-  width: 100%;
-  border-color: rgba(151, 126, 255, 0.28);
-  background: linear-gradient(135deg, rgba(129, 95, 255, 0.2), rgba(74, 107, 255, 0.12));
-  color: #cfc3ff;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: default;
-  opacity: 1;
+.proLicensePanel {
+  padding: 11px;
+  border: 1px solid rgba(151, 126, 255, 0.28);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(129, 95, 255, 0.13), rgba(74, 107, 255, 0.07));
 }
 
-.proComingButton:hover {
-  transform: none;
+.proLicenseHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.proLicenseHeading > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.proLicenseHeading strong {
+  font-size: 11px;
+}
+
+.proLicenseHeading small {
+  margin-top: 2px;
+  color: var(--mutedText);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.proLicenseStatus {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid var(--borderColor);
+  border-radius: 999px;
+  color: var(--mutedText);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.proLicenseStatus.active {
+  border-color: rgba(88, 214, 148, 0.34);
+  background: rgba(50, 190, 118, 0.1);
+  color: #78e3aa;
+}
+
+.proLicenseField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.proLicenseField > span {
+  color: var(--mutedText);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.proLicenseField input {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--borderColor);
+  border-radius: 9px;
+  outline: none;
+  background: var(--panelSecondary);
+  color: var(--textColor);
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.proLicenseField input:focus {
+  border-color: rgba(132, 111, 255, 0.72);
+  box-shadow: 0 0 0 3px rgba(128, 99, 255, 0.1);
+}
+
+.proLicenseActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.proLicenseActions button {
+  min-height: 34px;
+  padding: 7px;
+  border: 1px solid var(--borderColor);
+  border-radius: 9px;
+  background: var(--panelSecondary);
+  color: var(--textColor);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.proLicenseActions .proPrimaryButton {
+  border-color: rgba(132, 111, 255, 0.42);
+  background: linear-gradient(135deg, rgba(129, 95, 255, 0.3), rgba(74, 107, 255, 0.22));
+  color: #eeeaff;
+}
+
+.proLicenseActions button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.proLicenseMessage {
+  min-height: 13px;
+  margin-top: 6px;
+  color: #ff9eae;
+  font-size: 8.5px;
+  line-height: 1.4;
+}
+
+.proLicenseMessage.success {
+  color: #78e3aa;
 }
 
 @media (prefers-reduced-motion: reduce) {
