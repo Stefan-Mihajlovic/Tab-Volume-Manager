@@ -60,12 +60,12 @@ const TVM_LICENSE_KEY = "tvmProLicenseKey";
 const TVM_INSTALLATION_ID_KEY = "tvmProInstallationId";
 const TVM_ENTITLEMENT_KEY = "tvmProEntitlement";
 const TVM_LICENSE_META_KEY = "tvmProLicenseMeta";
-const TVM_API_URL = "https://tvm-licensing-api.optiflowzoffice.workers.dev";
+const TVM_API_URL = "https://tvm-licensing-api-prod.optiflowzoffice.workers.dev";
 const TVM_PRO_URL = "https://stefanmihajlovic.com/tab-volume-manager/#pro";
 const TVM_LICENSE_PUBLIC_JWK = {
   kty: "EC",
-  x: "8Fd8yVpXuwL877LWa4AJv4gYG-km1QeQfH21XDgyp9Q",
-  y: "M74OitFNOHGF8jxQpXyEEZJ5Z5BcHGcxxB4ykIet7r8",
+  x: "AZpnxE_j3aaAUwUkzkVbagqa-j7HoVmCbsTLglwGvgs",
+  y: "B9jdmU1uF6mSdkPwICYXfov8S5s3WeNQ_Y8susG6d9Y",
   crv: "P-256",
 };
 const meterPort = chrome.runtime.connect({ name: "ZAZ_METER" });
