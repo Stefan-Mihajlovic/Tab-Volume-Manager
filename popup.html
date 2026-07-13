@@ -244,7 +244,7 @@
                 </div>
                 <div class="proLicenseActions">
                   <button id="manageProButton" class="proPrimaryButton" type="button">Manage billing</button>
-                  <button id="deactivateProButton" type="button">Deactivate here</button>
+                  <button id="transferProButton" type="button">Transfer device</button>
                 </div>
               </div>
 
@@ -286,6 +286,28 @@
             <button class="modalClose" type="button" data-close-modal="loadPresetModal" aria-label="Close load preset dialog">&times;</button>
           </div>
           <div id="presetSlots" class="presetSlots"></div>
+        </section>
+      </div>
+
+      <div id="transferLicenseModal" class="modalBackdrop hidden" role="dialog" aria-modal="true" aria-labelledby="transferLicenseTitle">
+        <section class="modalPanel">
+          <div class="modalHeader">
+            <div>
+              <span class="sectionEyebrow">Move Pro access</span>
+              <h3 id="transferLicenseTitle" class="modalTitle">Transfer to another device</h3>
+            </div>
+            <button class="modalClose" type="button" data-close-modal="transferLicenseModal" aria-label="Close transfer dialog">&times;</button>
+          </div>
+          <p class="modalDescription">Copy this license key first. Confirming the transfer will deactivate Pro on this installation and free its activation slot.</p>
+          <div class="transferLicenseKeyRow">
+            <code id="transferLicenseKey">TVM-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX</code>
+            <button id="copyTransferLicenseButton" type="button">Copy</button>
+          </div>
+          <p id="transferLicenseMessage" class="fieldError hidden" role="status"></p>
+          <div class="modalActions">
+            <button type="button" data-close-modal="transferLicenseModal">Cancel</button>
+            <button id="confirmTransferButton" class="modalPrimary" type="button">Confirm transfer</button>
+          </div>
         </section>
       </div>
 

@@ -19,6 +19,7 @@ const savePresetButton = document.getElementById("savePresetButton");
 const loadPresetButton = document.getElementById("loadPresetButton");
 const savePresetModal = document.getElementById("savePresetModal");
 const loadPresetModal = document.getElementById("loadPresetModal");
+const transferLicenseModal = document.getElementById("transferLicenseModal");
 const presetNameInput = document.getElementById("presetNameInput");
 const presetNameError = document.getElementById("presetNameError");
 const confirmSavePreset = document.getElementById("confirmSavePreset");
@@ -36,7 +37,11 @@ const proLicenseSummary = document.getElementById("proLicenseSummary");
 const activateProButton = document.getElementById("activateProButton");
 const getProButton = document.getElementById("getProButton");
 const manageProButton = document.getElementById("manageProButton");
-const deactivateProButton = document.getElementById("deactivateProButton");
+const transferProButton = document.getElementById("transferProButton");
+const transferLicenseKey = document.getElementById("transferLicenseKey");
+const transferLicenseMessage = document.getElementById("transferLicenseMessage");
+const copyTransferLicenseButton = document.getElementById("copyTransferLicenseButton");
+const confirmTransferButton = document.getElementById("confirmTransferButton");
 const smartLimiterToggle = document.getElementById("smartLimiterToggle");
 const smartLimiterStrength = document.getElementById("smartLimiterStrength");
 const smartLimiterValue = document.getElementById("smartLimiterValue");
@@ -264,7 +269,7 @@ function setProUiInactive(message = "") {
 }
 
 function setProButtonsDisabled(disabled) {
-  [activateProButton, getProButton, manageProButton, deactivateProButton]
+  [activateProButton, getProButton, manageProButton, transferProButton]
     .forEach((button) => { button.disabled = disabled; });
 }
 
@@ -390,9 +395,41 @@ async function manageProBilling() {
   }
 }
 
-async function deactivateProLicense() {
+async function openLicenseTransfer() {
+  const stored = await storageGet(TVM_LICENSE_KEY);
+  const licenseKey = stored[TVM_LICENSE_KEY];
+  if (!licenseKey) {
+    setProMessage("The saved license key could not be found.");
+    return;
+  }
+
+  transferLicenseKey.textContent = licenseKey;
+  transferLicenseMessage.textContent = "";
+  transferLicenseMessage.classList.add("hidden");
+  copyTransferLicenseButton.textContent = "Copy";
+  openModal(transferLicenseModal);
+}
+
+async function copyTransferLicense() {
+  try {
+    await navigator.clipboard.writeText(transferLicenseKey.textContent);
+    copyTransferLicenseButton.textContent = "Copied";
+  } catch {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(transferLicenseKey);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    copyTransferLicenseButton.textContent = "Selected";
+  }
+}
+
+async function confirmLicenseTransfer() {
   setProButtonsDisabled(true);
-  setProMessage("Deactivating this installation…");
+  confirmTransferButton.disabled = true;
+  confirmTransferButton.textContent = "Transferring…";
+  transferLicenseMessage.classList.add("hidden");
+
   try {
     const stored = await storageGet([TVM_LICENSE_KEY, TVM_INSTALLATION_ID_KEY]);
     await postLicenseApi("/v1/license/deactivate", {
@@ -401,12 +438,16 @@ async function deactivateProLicense() {
     });
     await storageRemove([TVM_LICENSE_KEY, TVM_ENTITLEMENT_KEY, TVM_LICENSE_META_KEY]);
     proLicenseKeyInput.value = "";
-    setProUiInactive("This installation was deactivated. The slot is free again.");
-    setProMessage("This installation was deactivated. The slot is free again.", true);
+    closeModal(transferLicenseModal);
+    setProUiInactive("Transfer ready. Activate the copied key on your other device.");
+    setProMessage("This activation slot is now free for your other device.", true);
   } catch (error) {
-    setProMessage(error.message);
+    transferLicenseMessage.textContent = error.message;
+    transferLicenseMessage.classList.remove("hidden");
   } finally {
     setProButtonsDisabled(false);
+    confirmTransferButton.disabled = false;
+    confirmTransferButton.textContent = "Confirm transfer";
   }
 }
 
@@ -421,7 +462,9 @@ function setupProLicensing() {
   activateProButton.addEventListener("click", activateProLicense);
   getProButton.addEventListener("click", () => chrome.tabs.create({ url: TVM_PRO_URL }));
   manageProButton.addEventListener("click", manageProBilling);
-  deactivateProButton.addEventListener("click", deactivateProLicense);
+  transferProButton.addEventListener("click", openLicenseTransfer);
+  copyTransferLicenseButton.addEventListener("click", copyTransferLicense);
+  confirmTransferButton.addEventListener("click", confirmLicenseTransfer);
 }
 
 function applyTheme(theme) {
@@ -677,7 +720,7 @@ function setupPresetControls() {
     });
   });
 
-  [savePresetModal, loadPresetModal].forEach((modal) => {
+  [savePresetModal, loadPresetModal, transferLicenseModal].forEach((modal) => {
     modal.addEventListener("click", (event) => {
       if (event.target === modal) closeModal(modal);
     });
@@ -687,6 +730,7 @@ function setupPresetControls() {
     if (event.key !== "Escape") return;
     closeModal(savePresetModal);
     closeModal(loadPresetModal);
+    closeModal(transferLicenseModal);
   });
 }
 

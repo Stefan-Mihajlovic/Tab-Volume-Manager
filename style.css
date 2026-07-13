@@ -202,7 +202,7 @@ header h3 {
 
 .proTabSpark {
   display: inline-block;
-  margin-right: 2px;
+  margin-right: 4px;
   color: #c7b0ff;
   transform-origin: center;
 }
@@ -857,6 +857,36 @@ h3 input:focus {
   background: linear-gradient(135deg, var(--accentColor), var(--accentDarker));
   color: white;
   font-weight: 600;
+}
+
+.transferLicenseKeyRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 9px;
+  border: 1px solid var(--borderColor);
+  border-radius: 12px;
+  background: var(--panelSecondary);
+}
+
+.transferLicenseKeyRow code {
+  overflow-wrap: anywhere;
+  color: var(--textColor);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.transferLicenseKeyRow button {
+  padding: 8px 10px;
+  border: 1px solid rgba(132, 111, 255, 0.36);
+  border-radius: 9px;
+  background: rgba(126, 96, 255, 0.12);
+  color: var(--textColor);
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .presetSlots {
