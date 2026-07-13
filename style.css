@@ -1071,6 +1071,10 @@ button.presetSlot:not(:disabled):hover {
   gap: 12px;
 }
 
+#proMarketingContent.hidden {
+  display: none;
+}
+
 .proFeature {
   display: flex;
   align-items: center;
