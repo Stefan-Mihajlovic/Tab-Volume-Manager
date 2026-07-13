@@ -1,15 +1,18 @@
 (function () {
   "use strict";
 
-  const EQ_FREQUENCIES = [32, 64, 250, 1000, 4000, 8000];
-  const EQ_Q_VALUES = [0.8, 1, 1, 1.1, 1.2, 0.8];
+  const EQ_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+  const EQ_Q_VALUES = [0.8, 1, 1, 1, 1, 1.1, 1.1, 1.2, 1, 0.8];
   const BASS_EFFECT_MULTIPLIER = 1.5;
 
   window.__zazVolumeManager = {
     gain: 1,
     effectMode: "none",
     effectAmount: 0,
-    eqBands: [0, 0, 0, 0, 0, 0],
+    eqBands: EQ_FREQUENCIES.map(() => 0),
+    pro: null,
+    proValidUntil: 0,
+    proExpiryTimer: null,
     nodes: new WeakMap(),
     contexts: new Set(),
   };
@@ -39,6 +42,13 @@
     const effectBass = ctx.createBiquadFilter();
     const effectVoice = ctx.createBiquadFilter();
     const eqFilters = EQ_FREQUENCIES.map((_, index) => createEqFilter(ctx, index));
+    const dialogueHighpass = ctx.createBiquadFilter();
+    const dialogueWarmth = ctx.createBiquadFilter();
+    const dialoguePresence = ctx.createBiquadFilter();
+    const dialogueCompressor = ctx.createDynamicsCompressor();
+    const adaptiveCompressor = ctx.createDynamicsCompressor();
+    const adaptiveGain = ctx.createGain();
+    const limiter = ctx.createDynamicsCompressor();
 
     effectBass.type = "lowshelf";
     effectBass.frequency.value = 180;
@@ -48,6 +58,13 @@
     effectVoice.frequency.value = 2200;
     effectVoice.Q.value = 1.1;
     effectVoice.gain.value = 0;
+    dialogueHighpass.type = "highpass";
+    dialogueHighpass.frequency.value = 20;
+    dialogueWarmth.type = "lowshelf";
+    dialogueWarmth.frequency.value = 220;
+    dialoguePresence.type = "peaking";
+    dialoguePresence.frequency.value = 2600;
+    dialoguePresence.Q.value = 1.05;
 
     gain.gain.value = manager.gain;
 
@@ -59,10 +76,20 @@
       currentNode = filter;
     });
 
-    currentNode.connect(gain);
-    gain.connect(ctx.destination);
+    currentNode.connect(dialogueHighpass);
+    dialogueHighpass.connect(dialogueWarmth);
+    dialogueWarmth.connect(dialoguePresence);
+    dialoguePresence.connect(dialogueCompressor);
+    dialogueCompressor.connect(adaptiveCompressor);
+    adaptiveCompressor.connect(adaptiveGain);
+    adaptiveGain.connect(gain);
+    gain.connect(limiter);
+    limiter.connect(ctx.destination);
 
-    return { gain, effectBass, effectVoice, eqFilters };
+    return {
+      gain, effectBass, effectVoice, eqFilters, dialogueHighpass, dialogueWarmth,
+      dialoguePresence, dialogueCompressor, adaptiveCompressor, adaptiveGain, limiter,
+    };
   }
 
   function getEffectCurve(mode, amount) {
@@ -70,19 +97,31 @@
       const boostedAmount = amount * BASS_EFFECT_MULTIPLIER;
       return [
         boostedAmount,
-        boostedAmount * 0.55,
+        boostedAmount * 0.72,
+        boostedAmount * 0.4,
         boostedAmount * 0.2,
+        boostedAmount * 0.08,
         0,
-        -boostedAmount * 0.15,
+        -boostedAmount * 0.05,
+        -boostedAmount * 0.12,
         -boostedAmount * 0.1,
+        -boostedAmount * 0.08,
       ];
     }
 
     if (mode === "voice") {
-      return [-amount * 0.15, -amount * 0.1, amount * 0.25, amount * 0.55, amount * 0.85, amount * 0.2];
+      return [-amount * 0.15, -amount * 0.12, -amount * 0.05, amount * 0.1, amount * 0.25, amount * 0.55, amount * 0.75, amount * 0.85, amount * 0.3, amount * 0.1];
     }
 
-    return [0, 0, 0, 0, 0, 0];
+    return EQ_FREQUENCIES.map(() => 0);
+  }
+
+  function readProTool(name) {
+    const tool = manager.pro?.[name];
+    return {
+      enabled: Boolean(tool?.enabled),
+      strength: Math.max(0, Math.min(100, Number(tool?.strength) || 0)),
+    };
   }
 
   function applySettings() {
@@ -102,6 +141,29 @@
         const manualEq = Number(manager.eqBands[index] ?? 0);
         filter.gain.value = manualEq + effectCurve[index];
       });
+
+      const now = ctx.currentTime;
+      const dialogue = readProTool("movieDialogue");
+      const dialogueAmount = dialogue.enabled ? dialogue.strength / 100 : 0;
+      nodes.dialogueHighpass.frequency.setTargetAtTime(20 + dialogueAmount * 75, now, 0.03);
+      nodes.dialogueWarmth.gain.setTargetAtTime(-3.5 * dialogueAmount, now, 0.03);
+      nodes.dialoguePresence.gain.setTargetAtTime(6 * dialogueAmount, now, 0.03);
+      nodes.dialogueCompressor.threshold.setTargetAtTime(dialogue.enabled ? -25 : 0, now, 0.03);
+      nodes.dialogueCompressor.knee.setTargetAtTime(dialogue.enabled ? 16 : 0, now, 0.03);
+      nodes.dialogueCompressor.ratio.setTargetAtTime(dialogue.enabled ? 1.5 + dialogueAmount * 2.5 : 1, now, 0.03);
+
+      const adaptive = readProTool("adaptiveVolume");
+      const adaptiveAmount = adaptive.enabled ? adaptive.strength / 100 : 0;
+      nodes.adaptiveCompressor.threshold.setTargetAtTime(adaptive.enabled ? -18 - adaptiveAmount * 20 : 0, now, 0.04);
+      nodes.adaptiveCompressor.knee.setTargetAtTime(adaptive.enabled ? 12 + adaptiveAmount * 16 : 0, now, 0.04);
+      nodes.adaptiveCompressor.ratio.setTargetAtTime(adaptive.enabled ? 1.5 + adaptiveAmount * 4.5 : 1, now, 0.04);
+      nodes.adaptiveGain.gain.setTargetAtTime(adaptive.enabled ? Math.pow(10, (adaptiveAmount * 5) / 20) : 1, now, 0.04);
+
+      const limiter = readProTool("smartLimiter");
+      const limiterAmount = limiter.enabled ? limiter.strength / 100 : 0;
+      nodes.limiter.threshold.setTargetAtTime(limiter.enabled ? -1 - limiterAmount * 3.5 : 0, now, 0.015);
+      nodes.limiter.knee.setTargetAtTime(limiter.enabled ? 1.5 : 0, now, 0.015);
+      nodes.limiter.ratio.setTargetAtTime(limiter.enabled ? 8 + limiterAmount * 12 : 1, now, 0.015);
     });
   }
 
@@ -209,9 +271,20 @@
       manager.gain = e.data.volume / 100;
       manager.effectMode = e.data.effectMode;
       manager.effectAmount = e.data.effectAmount;
-      manager.eqBands = Array.isArray(e.data.eqBands) && e.data.eqBands.length === 6
+      manager.eqBands = Array.isArray(e.data.eqBands) && e.data.eqBands.length === 10
         ? e.data.eqBands.map((band) => Number(band) || 0)
-        : [0, 0, 0, 0, 0, 0];
+        : EQ_FREQUENCIES.map(() => 0);
+      manager.proValidUntil = Number(e.data.proValidUntil) || 0;
+      manager.pro = manager.proValidUntil > Date.now() / 1000 ? e.data.pro || null : null;
+      clearTimeout(manager.proExpiryTimer);
+      if (manager.pro) {
+        const expiryDelay = Math.max(0, Math.min(2147483647, manager.proValidUntil * 1000 - Date.now()));
+        manager.proExpiryTimer = setTimeout(() => {
+          manager.pro = null;
+          manager.proValidUntil = 0;
+          applySettings();
+        }, expiryDelay);
+      }
       applySettings();
     }
   });

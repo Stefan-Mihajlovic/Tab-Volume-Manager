@@ -22,10 +22,12 @@ const loadPresetModal = document.getElementById("loadPresetModal");
 const presetNameInput = document.getElementById("presetNameInput");
 const presetNameError = document.getElementById("presetNameError");
 const confirmSavePreset = document.getElementById("confirmSavePreset");
-const savedPresetSlot = document.getElementById("savedPresetSlot");
-const savedPresetName = document.getElementById("savedPresetName");
-const savedPresetSummary = document.getElementById("savedPresetSummary");
+const savePresetDescription = document.getElementById("savePresetDescription");
+const presetSlots = document.getElementById("presetSlots");
 const proStatusBadge = document.getElementById("proStatusBadge");
+const headerProBadge = document.getElementById("headerProBadge");
+const proMarketingContent = document.getElementById("proMarketingContent");
+const proToolsContent = document.getElementById("proToolsContent");
 const proActivationState = document.getElementById("proActivationState");
 const proActiveState = document.getElementById("proActiveState");
 const proLicenseKeyInput = document.getElementById("proLicenseKeyInput");
@@ -35,9 +37,25 @@ const activateProButton = document.getElementById("activateProButton");
 const getProButton = document.getElementById("getProButton");
 const manageProButton = document.getElementById("manageProButton");
 const deactivateProButton = document.getElementById("deactivateProButton");
-const EQ_DEFAULTS = [0, 0, 0, 0, 0, 0];
+const smartLimiterToggle = document.getElementById("smartLimiterToggle");
+const smartLimiterStrength = document.getElementById("smartLimiterStrength");
+const smartLimiterValue = document.getElementById("smartLimiterValue");
+const adaptiveVolumeToggle = document.getElementById("adaptiveVolumeToggle");
+const adaptiveVolumeStrength = document.getElementById("adaptiveVolumeStrength");
+const adaptiveVolumeValue = document.getElementById("adaptiveVolumeValue");
+const movieDialogueToggle = document.getElementById("movieDialogueToggle");
+const movieDialogueStrength = document.getElementById("movieDialogueStrength");
+const movieDialogueValue = document.getElementById("movieDialogueValue");
+const refreshMixerButton = document.getElementById("refreshMixerButton");
+const mixerTabList = document.getElementById("mixerTabList");
+const EQ_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const FREE_EQ_INDICES = new Set([0, 1, 3, 5, 7, 8]);
+const EQ_DEFAULTS = EQ_FREQUENCIES.map(() => 0);
 const ACTIVE_TAB_KEY = "activeControlTab";
 const SAVED_EQ_PRESET_KEY = "savedEqPreset";
+const SAVED_EQ_PRESETS_KEY = "savedEqPresets";
+const PRO_AUDIO_SETTINGS_KEY = "tvmProAudioSettings";
+const PRO_MIXER_VOLUMES_KEY = "tvmProMixerVolumes";
 const TVM_LICENSE_KEY = "tvmProLicenseKey";
 const TVM_INSTALLATION_ID_KEY = "tvmProInstallationId";
 const TVM_ENTITLEMENT_KEY = "tvmProEntitlement";
@@ -57,9 +75,17 @@ let activeTabId = null;
 let effectMode = "none";
 let effectAmount = 10;
 let eqBands = [...EQ_DEFAULTS];
-let savedEqPreset = null;
+let savedEqPresets = [];
 let loadedPresetName = null;
 let lastMeterUpdateAt = 0;
+let isProActive = false;
+let proValidUntil = 0;
+let proAudioSettings = {
+  smartLimiter: { enabled: false, strength: 70 },
+  adaptiveVolume: { enabled: false, strength: 50 },
+  movieDialogue: { enabled: false, strength: 60 },
+};
+let mixerVolumes = {};
 
 function storageGet(keys) {
   return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
@@ -71,6 +97,52 @@ function storageSet(values) {
 
 function storageRemove(keys) {
   return new Promise((resolve) => chrome.storage.local.remove(keys, resolve));
+}
+
+function normalizeEqBands(bands) {
+  if (!Array.isArray(bands)) return [...EQ_DEFAULTS];
+  if (bands.length === 6) {
+    return [bands[0], bands[1], 0, bands[2], 0, bands[3], 0, bands[4], bands[5], 0]
+      .map((band) => Math.max(-15, Math.min(15, Number(band) || 0)));
+  }
+  return EQ_DEFAULTS.map((_, index) =>
+    Math.max(-15, Math.min(15, Number(bands[index]) || 0))
+  );
+}
+
+function getEffectiveEqBands(bands = eqBands) {
+  const normalized = normalizeEqBands(bands);
+  if (isProActive) return normalized;
+  return normalized.map((band, index) => FREE_EQ_INDICES.has(index) ? band : 0);
+}
+
+function normalizeProTool(tool, defaults) {
+  const strength = Number(tool?.strength);
+  return {
+    enabled: Boolean(tool?.enabled),
+    strength: Number.isFinite(strength)
+      ? Math.max(0, Math.min(100, strength))
+      : defaults.strength,
+  };
+}
+
+function normalizeProAudioSettings(settings) {
+  return {
+    smartLimiter: normalizeProTool(settings?.smartLimiter, { strength: 70 }),
+    adaptiveVolume: normalizeProTool(settings?.adaptiveVolume, { strength: 50 }),
+    movieDialogue: normalizeProTool(settings?.movieDialogue, { strength: 60 }),
+  };
+}
+
+function getEffectiveProSettings() {
+  if (!isProActive) {
+    return {
+      smartLimiter: { enabled: false, strength: 0 },
+      adaptiveVolume: { enabled: false, strength: 0 },
+      movieDialogue: { enabled: false, strength: 0 },
+    };
+  }
+  return normalizeProAudioSettings(proAudioSettings);
 }
 
 function bytesToHex(bytes) {
@@ -151,7 +223,25 @@ function setProMessage(message = "", success = false) {
   proLicenseMessage.classList.toggle("success", success);
 }
 
-function setProUiActive(license, offline = false) {
+function applyProAccessState(active) {
+  isProActive = Boolean(active);
+  document.body.classList.toggle("proActive", isProActive);
+  headerProBadge.classList.toggle("hidden", !isProActive);
+  proMarketingContent.classList.toggle("hidden", isProActive);
+  proToolsContent.classList.toggle("hidden", !isProActive);
+  eqBands = normalizeEqBands(eqBands);
+  syncEqualizerUI();
+  updateSavedPresetSlots();
+  savePresetDescription.textContent = isProActive
+    ? "Save the current 10-band equalizer settings. Pro includes unlimited presets."
+    : "Save the current six-band equalizer settings.";
+
+  if (isProActive) refreshMixerTabs();
+  if (Number.isInteger(activeTabId)) updateAudio(slider.value);
+}
+
+function setProUiActive(license, offline = false, expiresAt = 0) {
+  proValidUntil = Number(expiresAt) || 0;
   proActivationState.classList.add("hidden");
   proActiveState.classList.remove("hidden");
   proStatusBadge.textContent = "✦ Pro active";
@@ -161,13 +251,16 @@ function setProUiActive(license, offline = false) {
   const suffix = license?.lastFour ? ` •••• ${license.lastFour}` : "";
   proLicenseSummary.textContent = `${planName} license${suffix} is active on this installation.`;
   setProMessage(offline ? "Offline verification active. We will sync again when online." : "License verified.", true);
+  applyProAccessState(true);
 }
 
 function setProUiInactive(message = "") {
+  proValidUntil = 0;
   proActiveState.classList.add("hidden");
   proActivationState.classList.remove("hidden");
   proStatusBadge.textContent = "✦ Pro access";
   setProMessage(message);
+  applyProAccessState(false);
 }
 
 function setProButtonsDisabled(disabled) {
@@ -204,7 +297,7 @@ async function activateProLicense() {
       throw new Error("The license server returned an invalid entitlement.");
     }
     await storeProAccess(licenseKey, result);
-    setProUiActive(result.license);
+    setProUiActive(result.license, false, result.entitlement.expiresAt);
   } catch (error) {
     const messages = {
       license_not_found: "That license key could not be found.",
@@ -227,36 +320,58 @@ async function validateStoredProLicense() {
   const licenseKey = stored[TVM_LICENSE_KEY];
   if (typeof licenseKey !== "string") {
     setProUiInactive();
-    return;
+    document.body.classList.remove("licensePending");
+    return false;
   }
 
   proLicenseKeyInput.value = licenseKey;
   const installationId = await ensureInstallationId();
-  try {
-    const result = await postLicenseApi("/v1/license/validate", {
-      licenseKey,
-      installationId,
-      extensionVersion: chrome.runtime.getManifest().version,
-    });
-    if (!await verifyEntitlement(result.entitlement, installationId)) {
-      throw new Error("The license server returned an invalid entitlement.");
-    }
-    await storeProAccess(licenseKey, result);
-    setProUiActive(result.license);
-  } catch (error) {
-    const cachedIsValid = await verifyEntitlement(stored[TVM_ENTITLEMENT_KEY], installationId);
-    if ((!error.status || error.status >= 500) && cachedIsValid) {
-      setProUiActive(stored[TVM_LICENSE_META_KEY], true);
-      return;
-    }
-    await storageRemove([TVM_LICENSE_KEY, TVM_ENTITLEMENT_KEY, TVM_LICENSE_META_KEY]);
-    const message = error.code === "license_inactive"
-      ? "Your Pro license is no longer active."
-      : error.code === "installation_not_activated"
-        ? "This installation needs to be activated again."
-        : "Could not verify the saved license.";
-    setProUiInactive(message);
+  const cachedIsValid = await verifyEntitlement(stored[TVM_ENTITLEMENT_KEY], installationId);
+  if (cachedIsValid) {
+    setProUiActive(
+      stored[TVM_LICENSE_META_KEY],
+      true,
+      stored[TVM_ENTITLEMENT_KEY]?.expiresAt
+    );
+  } else {
+    setProUiInactive("Checking your saved license…");
   }
+  document.body.classList.remove("licensePending");
+
+  const validateRemotely = async () => {
+    try {
+      const result = await postLicenseApi("/v1/license/validate", {
+        licenseKey,
+        installationId,
+        extensionVersion: chrome.runtime.getManifest().version,
+      });
+      if (!await verifyEntitlement(result.entitlement, installationId)) {
+        throw new Error("The license server returned an invalid entitlement.");
+      }
+      await storeProAccess(licenseKey, result);
+      setProUiActive(result.license, false, result.entitlement.expiresAt);
+      return true;
+    } catch (error) {
+      if ((!error.status || error.status >= 500) && cachedIsValid) {
+        setProUiActive(stored[TVM_LICENSE_META_KEY], true, stored[TVM_ENTITLEMENT_KEY]?.expiresAt);
+        return true;
+      }
+      await storageRemove([TVM_LICENSE_KEY, TVM_ENTITLEMENT_KEY, TVM_LICENSE_META_KEY]);
+      const message = error.code === "license_inactive"
+        ? "Your Pro license is no longer active."
+        : error.code === "installation_not_activated"
+          ? "This installation needs to be activated again."
+          : "Could not verify the saved license.";
+      setProUiInactive(message);
+      return false;
+    }
+  };
+
+  if (cachedIsValid) {
+    void validateRemotely();
+    return true;
+  }
+  return validateRemotely();
 }
 
 async function manageProBilling() {
@@ -307,11 +422,12 @@ function setupProLicensing() {
   getProButton.addEventListener("click", () => chrome.tabs.create({ url: TVM_PRO_URL }));
   manageProButton.addEventListener("click", manageProBilling);
   deactivateProButton.addEventListener("click", deactivateProLicense);
-  validateStoredProLicense();
 }
 
 function applyTheme(theme) {
   const isLight = theme === "light";
+
+  document.body.classList.toggle("lightTheme", isLight);
 
   document.documentElement.style.setProperty("--bodyBackground", isLight ? "#f4f6fb" : "#10131a");
   document.documentElement.style.setProperty("--panelBackground", isLight ? "#ffffff" : "#181d27");
@@ -416,46 +532,110 @@ function openModal(modal) {
   modal.classList.remove("hidden");
 }
 
-function updateSavedPresetSlot() {
-  const hasPreset = Boolean(savedEqPreset);
-  savedPresetSlot.disabled = !hasPreset;
-  savedPresetSlot.classList.toggle("emptyPresetSlot", !hasPreset);
-  savedPresetName.textContent = hasPreset ? savedEqPreset.name : "Empty preset slot";
-  savedPresetSummary.textContent = hasPreset
-    ? "6-band EQ • Click to load"
-    : "Save an EQ preset first";
+function presetBandLabel() {
+  return isProActive ? "10-band EQ" : "6-band EQ";
+}
+
+function createPresetSlot(preset, sourceIndex, displayIndex) {
+  const row = document.createElement("div");
+  row.className = "presetSlotRow";
+
+  const loadButton = document.createElement("button");
+  loadButton.className = "presetSlot";
+  loadButton.type = "button";
+  loadButton.innerHTML = `
+    <span class="presetSlotNumber">${displayIndex + 1}</span>
+    <span class="presetSlotCopy"><strong></strong><small>${presetBandLabel()} • Click to load</small></span>
+    <span class="presetSlotAction">Load</span>`;
+  loadButton.querySelector("strong").textContent = preset.name;
+  loadButton.addEventListener("click", () => {
+    eqBands = normalizeEqBands(preset.eqBands);
+    loadedPresetName = preset.name;
+    syncEqualizerUI();
+    updatePresetStatus();
+    updateAudio(slider.value);
+    savePreset(slider.value, effectMode, effectAmount);
+    closeModal(loadPresetModal);
+  });
+  row.appendChild(loadButton);
+
+  const deleteButton = document.createElement("button");
+  deleteButton.className = "presetDelete";
+  deleteButton.type = "button";
+  deleteButton.setAttribute("aria-label", `Delete preset ${preset.name}`);
+  deleteButton.textContent = "×";
+  deleteButton.addEventListener("click", async () => {
+    savedEqPresets.splice(sourceIndex, 1);
+    if (loadedPresetName === preset.name) clearLoadedPreset();
+    await storageSet({ [SAVED_EQ_PRESETS_KEY]: savedEqPresets });
+    updateSavedPresetSlots();
+  });
+  row.appendChild(deleteButton);
+  return row;
+}
+
+function updateSavedPresetSlots() {
+  if (!presetSlots) return;
+  presetSlots.replaceChildren();
+  const visiblePresets = savedEqPresets
+    .map((preset, sourceIndex) => ({ preset, sourceIndex }))
+    .filter(({ preset }) => isProActive || !preset.proOnly)
+    .slice(0, isProActive ? undefined : 1);
+  visiblePresets.forEach(({ preset, sourceIndex }, displayIndex) =>
+    presetSlots.appendChild(createPresetSlot(preset, sourceIndex, displayIndex))
+  );
+
+  if (visiblePresets.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "presetSlot emptyPresetSlot";
+    empty.innerHTML = `<span class="presetSlotNumber">1</span><span class="presetSlotCopy"><strong>Empty preset slot</strong><small>Save an EQ preset first</small></span>`;
+    presetSlots.appendChild(empty);
+  }
+
+  if (!isProActive) {
+    const locked = document.createElement("div");
+    locked.className = "presetSlot lockedPresetSlot";
+    locked.setAttribute("aria-disabled", "true");
+    locked.innerHTML = `<span class="presetSlotNumber">∞</span><span class="presetSlotCopy"><strong>Unlimited presets</strong><small>Available with Pro</small></span><span class="presetSlotLock" aria-hidden="true">🔒</span>`;
+    presetSlots.appendChild(locked);
+  }
+}
+
+async function loadSavedPresets() {
+  const result = await storageGet([SAVED_EQ_PRESETS_KEY, SAVED_EQ_PRESET_KEY]);
+  const savedList = Array.isArray(result[SAVED_EQ_PRESETS_KEY])
+    ? result[SAVED_EQ_PRESETS_KEY]
+    : result[SAVED_EQ_PRESET_KEY]
+      ? [result[SAVED_EQ_PRESET_KEY]]
+      : [];
+  savedEqPresets = savedList
+    .filter((preset) => preset && typeof preset.name === "string" && Array.isArray(preset.eqBands))
+    .map((preset, index) => ({
+      name: preset.name.slice(0, 32),
+      eqBands: normalizeEqBands(preset.eqBands),
+      proOnly: Boolean(preset.proOnly || index > 0),
+    }));
+  await storageSet({ [SAVED_EQ_PRESETS_KEY]: savedEqPresets });
+  updateSavedPresetSlots();
 }
 
 function setupPresetControls() {
-  chrome.storage.local.get(SAVED_EQ_PRESET_KEY, (result) => {
-    const preset = result[SAVED_EQ_PRESET_KEY];
-    if (
-      preset &&
-      typeof preset.name === "string" &&
-      Array.isArray(preset.eqBands) &&
-      preset.eqBands.length === 6
-    ) {
-      savedEqPreset = {
-        name: preset.name,
-        eqBands: preset.eqBands.map((band) => Math.max(-15, Math.min(15, Number(band) || 0))),
-      };
-    }
-    updateSavedPresetSlot();
-  });
-
   savePresetButton.addEventListener("click", () => {
-    presetNameInput.value = savedEqPreset?.name || "";
+    presetNameInput.value = loadedPresetName || (!isProActive && savedEqPresets[0]?.name) || "";
     presetNameError.classList.add("hidden");
     openModal(savePresetModal);
-    requestAnimationFrame(() => presetNameInput.focus());
+    requestAnimationFrame(() => {
+      presetNameInput.focus();
+      presetNameInput.select();
+    });
   });
 
   loadPresetButton.addEventListener("click", () => {
-    updateSavedPresetSlot();
+    updateSavedPresetSlots();
     openModal(loadPresetModal);
   });
 
-  confirmSavePreset.addEventListener("click", () => {
+  confirmSavePreset.addEventListener("click", async () => {
     const name = presetNameInput.value.trim();
     if (!name) {
       presetNameError.classList.remove("hidden");
@@ -463,29 +643,32 @@ function setupPresetControls() {
       return;
     }
 
-    savedEqPreset = { name, eqBands: eqBands.map(Number) };
+    const nextPreset = { name, eqBands: getEffectiveEqBands(), proOnly: false };
+    if (isProActive) {
+      const existingIndex = savedEqPresets.findIndex((preset) => preset.name.toLowerCase() === name.toLowerCase());
+      if (existingIndex >= 0) {
+        nextPreset.proOnly = savedEqPresets[existingIndex].proOnly;
+        savedEqPresets[existingIndex] = nextPreset;
+      } else {
+        nextPreset.proOnly = savedEqPresets.some((preset) => !preset.proOnly);
+        savedEqPresets.push(nextPreset);
+      }
+    } else {
+      const freeIndex = savedEqPresets.findIndex((preset) => !preset.proOnly);
+      if (freeIndex >= 0) savedEqPresets[freeIndex] = nextPreset;
+      else savedEqPresets.unshift(nextPreset);
+    }
     loadedPresetName = name;
     updatePresetStatus();
-    updateSavedPresetSlot();
+    updateSavedPresetSlots();
     savePreset(slider.value, effectMode, effectAmount);
-    chrome.storage.local.set({ [SAVED_EQ_PRESET_KEY]: savedEqPreset });
+    await storageSet({ [SAVED_EQ_PRESETS_KEY]: savedEqPresets });
     closeModal(savePresetModal);
   });
 
   presetNameInput.addEventListener("input", () => presetNameError.classList.add("hidden"));
   presetNameInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") confirmSavePreset.click();
-  });
-
-  savedPresetSlot.addEventListener("click", () => {
-    if (!savedEqPreset) return;
-    eqBands = [...savedEqPreset.eqBands];
-    loadedPresetName = savedEqPreset.name;
-    syncEqualizerUI();
-    updatePresetStatus();
-    updateAudio(slider.value);
-    savePreset(slider.value, effectMode, effectAmount);
-    closeModal(loadPresetModal);
   });
 
   document.querySelectorAll("[data-close-modal]").forEach((button) => {
@@ -586,6 +769,180 @@ function syncEqualizerUI() {
   updateEqualizerLabels();
 }
 
+function syncProToolsUI() {
+  const controls = [
+    [smartLimiterToggle, smartLimiterStrength, smartLimiterValue, proAudioSettings.smartLimiter],
+    [adaptiveVolumeToggle, adaptiveVolumeStrength, adaptiveVolumeValue, proAudioSettings.adaptiveVolume],
+    [movieDialogueToggle, movieDialogueStrength, movieDialogueValue, proAudioSettings.movieDialogue],
+  ];
+  controls.forEach(([toggle, sliderControl, output, settings]) => {
+    toggle.checked = settings.enabled;
+    sliderControl.value = settings.strength;
+    sliderControl.disabled = !settings.enabled;
+    output.textContent = `${settings.strength}%`;
+    toggle.closest(".proToolSection")?.classList.toggle("enabled", settings.enabled);
+  });
+}
+
+async function persistProAudioSettings() {
+  proAudioSettings = normalizeProAudioSettings(proAudioSettings);
+  await storageSet({ [PRO_AUDIO_SETTINGS_KEY]: proAudioSettings });
+  savePreset(slider.value, effectMode, effectAmount);
+  updateAudio(slider.value);
+}
+
+function bindProTool(toggle, strengthInput, valueOutput, settingName) {
+  toggle.addEventListener("change", () => {
+    proAudioSettings[settingName].enabled = toggle.checked;
+    syncProToolsUI();
+    persistProAudioSettings();
+  });
+  strengthInput.addEventListener("input", () => {
+    proAudioSettings[settingName].strength = Number(strengthInput.value);
+    valueOutput.textContent = `${strengthInput.value}%`;
+    persistProAudioSettings();
+  });
+}
+
+async function sendSettingsToTab(tabId, settings) {
+  return chrome.runtime.sendMessage({ type: "ZAZ_CAPTURE_TAB", tabId, settings });
+}
+
+function tabDisplayName(tab) {
+  try {
+    const hostname = new URL(tab.url).hostname;
+    if (hostname === "localhost" || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) {
+      return tab.title || hostname;
+    }
+    return formatSiteName(hostname);
+  } catch (error) {
+    return tab.title || "Audio tab";
+  }
+}
+
+async function applyMixerVolume(tab, volume) {
+  let hostname = null;
+  try { hostname = new URL(tab.url).hostname; } catch (error) { /* restricted tab */ }
+  const stored = hostname ? await storageGet(hostname) : {};
+  const siteSettings = hostname ? stored[hostname] || {} : {};
+  const savedEffectAmount = Number(siteSettings.effectAmount);
+  const settings = {
+    volume,
+    effectMode: siteSettings.effectMode || "none",
+    effectAmount: Number.isFinite(savedEffectAmount) ? savedEffectAmount : 10,
+    eqBands: getEffectiveEqBands(siteSettings.eqBands),
+    pro: getEffectiveProSettings(),
+    proValidUntil,
+  };
+  const result = await sendSettingsToTab(tab.id, settings);
+  if (!result?.ok) throw new Error(result?.error || "This tab could not be connected.");
+}
+
+async function refreshMixerTabs() {
+  if (!isProActive || !mixerTabList) return;
+  refreshMixerButton.disabled = true;
+  try {
+    const [tabs, captureStatus] = await Promise.all([
+      chrome.tabs.query({ audible: true, currentWindow: true }),
+      chrome.runtime.sendMessage({ type: "ZAZ_OFFSCREEN_STATUS", target: "offscreen" })
+        .catch(() => ({ tabIds: [] })),
+    ]);
+    const capturedTabIds = new Set(Array.isArray(captureStatus?.tabIds) ? captureStatus.tabIds : []);
+    mixerTabList.replaceChildren();
+    if (!tabs.length) {
+      const empty = document.createElement("p");
+      empty.className = "mixerEmpty";
+      empty.textContent = "No audible tabs right now. Start playback, then refresh.";
+      mixerTabList.appendChild(empty);
+      return;
+    }
+
+    tabs.forEach((tab) => {
+      const row = document.createElement("div");
+      row.className = "mixerTabRow";
+      const identity = document.createElement("div");
+      identity.className = "mixerIdentity";
+      const favicon = document.createElement("img");
+      favicon.src = tab.favIconUrl || "icons/icon32.png";
+      favicon.alt = "";
+      const copy = document.createElement("span");
+      const name = document.createElement("strong");
+      name.textContent = tabDisplayName(tab);
+      const title = document.createElement("small");
+      title.textContent = tab.title || "Playing audio";
+      copy.append(name, title);
+
+      const needsConnection = tab.id !== activeTabId && !capturedTabIds.has(tab.id);
+      if (needsConnection) {
+        const connectionNote = document.createElement("small");
+        connectionNote.className = "mixerConnectionNote";
+        connectionNote.textContent = "Open TVM on this tab once to connect";
+        copy.append(connectionNote);
+        row.classList.add("mixerNeedsConnection");
+      }
+      identity.append(favicon, copy);
+
+      const storedMixerVolume = Number(mixerVolumes[tab.id]);
+      const defaultMixerVolume = tab.id === activeTabId ? Number(slider.value) : 100;
+      const value = Math.max(0, Math.min(500, Number.isFinite(storedMixerVolume) ? storedMixerVolume : defaultMixerVolume));
+      const volumeWrap = document.createElement("label");
+      volumeWrap.className = "mixerVolume";
+      const output = document.createElement("output");
+      output.textContent = `${value}%`;
+      const input = document.createElement("input");
+      input.type = "range";
+      input.min = "0";
+      input.max = "500";
+      input.value = String(value);
+      input.setAttribute("aria-label", `${name.textContent} volume`);
+      input.disabled = needsConnection;
+      input.addEventListener("input", () => {
+        const nextVolume = Number(input.value);
+        output.textContent = `${nextVolume}%`;
+        mixerVolumes[tab.id] = nextVolume;
+        storageSet({ [PRO_MIXER_VOLUMES_KEY]: mixerVolumes });
+        row.classList.remove("mixerError");
+        applyMixerVolume(tab, nextVolume).catch((error) => {
+          row.classList.add("mixerError");
+          row.title = error.message;
+        });
+        if (tab.id === activeTabId) {
+          slider.value = String(nextVolume);
+          updateVolumeProc();
+        }
+      });
+      volumeWrap.append(output, input);
+      row.append(identity, volumeWrap);
+      mixerTabList.appendChild(row);
+    });
+  } finally {
+    refreshMixerButton.disabled = false;
+  }
+}
+
+function animateMixerRefresh() {
+  refreshMixerButton.classList.remove("refreshing");
+  void refreshMixerButton.offsetWidth;
+  refreshMixerButton.classList.add("refreshing");
+  window.setTimeout(() => refreshMixerButton.classList.remove("refreshing"), 620);
+}
+
+async function setupProTools() {
+  const stored = await storageGet([PRO_AUDIO_SETTINGS_KEY, PRO_MIXER_VOLUMES_KEY]);
+  proAudioSettings = normalizeProAudioSettings(stored[PRO_AUDIO_SETTINGS_KEY]);
+  mixerVolumes = stored[PRO_MIXER_VOLUMES_KEY] && typeof stored[PRO_MIXER_VOLUMES_KEY] === "object"
+    ? stored[PRO_MIXER_VOLUMES_KEY]
+    : {};
+  syncProToolsUI();
+  bindProTool(smartLimiterToggle, smartLimiterStrength, smartLimiterValue, "smartLimiter");
+  bindProTool(adaptiveVolumeToggle, adaptiveVolumeStrength, adaptiveVolumeValue, "adaptiveVolume");
+  bindProTool(movieDialogueToggle, movieDialogueStrength, movieDialogueValue, "movieDialogue");
+  refreshMixerButton.addEventListener("click", () => {
+    animateMixerRefresh();
+    refreshMixerTabs();
+  });
+}
+
 function savePreset(volume, mode, amount, bands = eqBands) {
   if (!activeHostname) return;
 
@@ -594,8 +951,9 @@ function savePreset(volume, mode, amount, bands = eqBands) {
       volume: parseInt(volume, 10),
       effectMode: mode,
       effectAmount: parseInt(amount, 10),
-      eqBands: bands.map((band) => parseInt(band, 10)),
+      eqBands: normalizeEqBands(bands).map((band) => parseInt(band, 10)),
       eqPresetName: loadedPresetName,
+      proAudio: normalizeProAudioSettings(proAudioSettings),
     },
   });
 }
@@ -608,15 +966,13 @@ async function updateAudio(volume) {
     volume: parseInt(volume, 10),
     effectMode,
     effectAmount,
-    eqBands: eqBands.map(Number),
+    eqBands: getEffectiveEqBands(),
+    pro: getEffectiveProSettings(),
+    proValidUntil,
   };
 
   try {
-    const result = await chrome.runtime.sendMessage({
-      type: "ZAZ_CAPTURE_TAB",
-      tabId: tab.id,
-      settings,
-    });
+    const result = await sendSettingsToTab(tab.id, settings);
 
     if (result?.ok) return;
   } catch (error) {
@@ -627,7 +983,7 @@ async function updateAudio(volume) {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       world: "MAIN",
-      func: (volumeLevel, selectedEffectMode, selectedEffectAmount, customBands) => {
+      func: (volumeLevel, selectedEffectMode, selectedEffectAmount, customBands, proSettings) => {
         window.postMessage(
           {
             type: "ZAZ_VOLUME_UPDATE",
@@ -635,11 +991,12 @@ async function updateAudio(volume) {
             effectMode: selectedEffectMode,
             effectAmount: selectedEffectAmount,
             eqBands: customBands,
+            pro: proSettings,
           },
           "*"
         );
       },
-      args: [settings.volume, effectMode, effectAmount, settings.eqBands],
+      args: [settings.volume, effectMode, effectAmount, settings.eqBands, settings.pro],
     });
   } catch (error) {
     // Ignore pages where script injection is not allowed.
@@ -660,6 +1017,7 @@ themeToggle.addEventListener("change", () => {
   chrome.storage.local.set({ theme: newTheme });
 });
 
+function initializeActiveTab() {
 chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
   if (!tab?.url) return;
   activeTabId = tab.id;
@@ -698,9 +1056,11 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     effectSlider.value = preset.effectAmount ?? 10;
     effectMode = preset.effectMode ?? "none";
     effectAmount = preset.effectAmount ?? 10;
-    eqBands = Array.isArray(preset.eqBands) && preset.eqBands.length === 6
-      ? preset.eqBands.map((band) => parseInt(band, 10) || 0)
-      : [...EQ_DEFAULTS];
+    eqBands = normalizeEqBands(preset.eqBands);
+    if (isProActive && preset.proAudio) {
+      proAudioSettings = normalizeProAudioSettings(preset.proAudio);
+      syncProToolsUI();
+    }
     loadedPresetName = typeof preset.eqPresetName === "string"
       ? preset.eqPresetName
       : null;
@@ -713,6 +1073,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     updateAudio(slider.value);
   });
 });
+}
 
 meterPort.onMessage.addListener(applyMeterLevels);
 
@@ -803,11 +1164,18 @@ resetVolumeBtn.addEventListener("click", () => {
   updateVolumeProc();
 });
 
-updateVolumeProc();
-updateEffectsIntensityProc();
-syncEqualizerUI();
-highlightSelectedButton(effectMode);
-setupTabs();
-setupPresetControls();
-setupProLicensing();
-updatePresetStatus();
+async function initializeExtension() {
+  updateVolumeProc();
+  updateEffectsIntensityProc();
+  syncEqualizerUI();
+  highlightSelectedButton(effectMode);
+  setupTabs();
+  setupPresetControls();
+  setupProLicensing();
+  await Promise.all([setupProTools(), loadSavedPresets()]);
+  await validateStoredProLicense();
+  initializeActiveTab();
+  updatePresetStatus();
+}
+
+initializeExtension();

@@ -1,5 +1,5 @@
-const EQ_FREQUENCIES = [32, 64, 250, 1000, 4000, 8000];
-const EQ_Q_VALUES = [0.8, 1, 1, 1.1, 1.2, 0.8];
+const EQ_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const EQ_Q_VALUES = [0.8, 1, 1, 1, 1, 1.1, 1.1, 1.2, 1, 0.8];
 const sessions = new Map();
 const METER_INTERVAL_MS = 50;
 const METER_FLOOR_DB = -72;
@@ -23,20 +23,34 @@ function effectCurve(mode, amount) {
     const boostedAmount = amount * BASS_EFFECT_MULTIPLIER;
     return [
       boostedAmount,
-      boostedAmount * 0.55,
+      boostedAmount * 0.72,
+      boostedAmount * 0.4,
       boostedAmount * 0.2,
+      boostedAmount * 0.08,
       0,
-      -boostedAmount * 0.15,
+      -boostedAmount * 0.05,
+      -boostedAmount * 0.12,
       -boostedAmount * 0.1,
+      -boostedAmount * 0.08,
     ];
   }
   if (mode === "voice") {
-    return [-amount * 0.15, -amount * 0.1, amount * 0.25, amount * 0.55, amount * 0.85, amount * 0.2];
+    return [-amount * 0.15, -amount * 0.12, -amount * 0.05, amount * 0.1, amount * 0.25, amount * 0.55, amount * 0.75, amount * 0.85, amount * 0.3, amount * 0.1];
   }
-  return [0, 0, 0, 0, 0, 0];
+  return EQ_FREQUENCIES.map(() => 0);
+}
+
+function readProTool(settings, name) {
+  const tool = settings?.pro?.[name];
+  return {
+    enabled: Boolean(tool?.enabled),
+    strength: Math.max(0, Math.min(100, Number(tool?.strength) || 0)),
+  };
 }
 
 function applySettings(session, settings = {}) {
+  const proIsCurrent = Number(settings.proValidUntil) > Date.now() / 1000;
+  const effectiveSettings = proIsCurrent ? settings : { ...settings, pro: null };
   const volume = Math.max(0, Math.min(500, Number(settings.volume) || 0));
   const amount = Math.max(0, Math.min(20, Number(settings.effectAmount) || 0));
   const mode = ["bass", "voice"].includes(settings.effectMode)
@@ -45,6 +59,10 @@ function applySettings(session, settings = {}) {
   const bands = Array.isArray(settings.eqBands) ? settings.eqBands : [];
   const curve = effectCurve(mode, amount);
   const now = session.context.currentTime;
+  const limiter = readProTool(effectiveSettings, "smartLimiter");
+  const adaptive = readProTool(effectiveSettings, "adaptiveVolume");
+  const dialogue = readProTool(effectiveSettings, "movieDialogue");
+  session.lastSettings = effectiveSettings;
 
   session.gain.gain.setTargetAtTime(volume / 100, now, 0.015);
   session.effectBass.gain.setTargetAtTime(
@@ -60,6 +78,35 @@ function applySettings(session, settings = {}) {
     filter.gain.setTargetAtTime(totalGainDb, now, 0.015);
     session.visualBandDb[index] = totalGainDb;
   });
+
+  const dialogueAmount = dialogue.enabled ? dialogue.strength / 100 : 0;
+  session.dialogueHighpass.frequency.setTargetAtTime(20 + dialogueAmount * 75, now, 0.03);
+  session.dialogueWarmth.gain.setTargetAtTime(-3.5 * dialogueAmount, now, 0.03);
+  session.dialoguePresence.gain.setTargetAtTime(6 * dialogueAmount, now, 0.03);
+  session.dialogueCompressor.threshold.setTargetAtTime(dialogue.enabled ? -25 : 0, now, 0.03);
+  session.dialogueCompressor.knee.setTargetAtTime(dialogue.enabled ? 16 : 0, now, 0.03);
+  session.dialogueCompressor.ratio.setTargetAtTime(dialogue.enabled ? 1.5 + dialogueAmount * 2.5 : 1, now, 0.03);
+  session.dialogueCompressor.attack.setTargetAtTime(0.008, now, 0.03);
+  session.dialogueCompressor.release.setTargetAtTime(0.22, now, 0.03);
+
+  const adaptiveAmount = adaptive.enabled ? adaptive.strength / 100 : 0;
+  session.adaptiveCompressor.threshold.setTargetAtTime(adaptive.enabled ? -18 - adaptiveAmount * 20 : 0, now, 0.04);
+  session.adaptiveCompressor.knee.setTargetAtTime(adaptive.enabled ? 12 + adaptiveAmount * 16 : 0, now, 0.04);
+  session.adaptiveCompressor.ratio.setTargetAtTime(adaptive.enabled ? 1.5 + adaptiveAmount * 4.5 : 1, now, 0.04);
+  session.adaptiveCompressor.attack.setTargetAtTime(0.012, now, 0.04);
+  session.adaptiveCompressor.release.setTargetAtTime(0.35, now, 0.04);
+  session.adaptiveGain.gain.setTargetAtTime(
+    adaptive.enabled ? Math.pow(10, (adaptiveAmount * 5) / 20) : 1,
+    now,
+    0.04
+  );
+
+  const limiterAmount = limiter.enabled ? limiter.strength / 100 : 0;
+  session.limiter.threshold.setTargetAtTime(limiter.enabled ? -1 - limiterAmount * 3.5 : 0, now, 0.015);
+  session.limiter.knee.setTargetAtTime(limiter.enabled ? 1.5 : 0, now, 0.015);
+  session.limiter.ratio.setTargetAtTime(limiter.enabled ? 8 + limiterAmount * 12 : 1, now, 0.015);
+  session.limiter.attack.setTargetAtTime(0.002, now, 0.015);
+  session.limiter.release.setTargetAtTime(0.12, now, 0.015);
 }
 
 async function createSession(tabId, streamId, settings) {
@@ -79,7 +126,14 @@ async function createSession(tabId, streamId, settings) {
   const effectBass = context.createBiquadFilter();
   const effectVoice = context.createBiquadFilter();
   const filters = EQ_FREQUENCIES.map((_, index) => createFilter(context, index));
+  const dialogueHighpass = context.createBiquadFilter();
+  const dialogueWarmth = context.createBiquadFilter();
+  const dialoguePresence = context.createBiquadFilter();
+  const dialogueCompressor = context.createDynamicsCompressor();
+  const adaptiveCompressor = context.createDynamicsCompressor();
+  const adaptiveGain = context.createGain();
   const gain = context.createGain();
+  const limiter = context.createDynamicsCompressor();
 
   effectBass.type = "lowshelf";
   effectBass.frequency.value = 180;
@@ -88,6 +142,13 @@ async function createSession(tabId, streamId, settings) {
   effectVoice.frequency.value = 2200;
   effectVoice.Q.value = 1.1;
   effectVoice.gain.value = 0;
+  dialogueHighpass.type = "highpass";
+  dialogueHighpass.frequency.value = 20;
+  dialogueWarmth.type = "lowshelf";
+  dialogueWarmth.frequency.value = 220;
+  dialoguePresence.type = "peaking";
+  dialoguePresence.frequency.value = 2600;
+  dialoguePresence.Q.value = 1.05;
 
   analyser.fftSize = 4096;
   analyser.smoothingTimeConstant = 0.42;
@@ -102,8 +163,15 @@ async function createSession(tabId, streamId, settings) {
     current.connect(filter);
     current = filter;
   });
-  current.connect(gain);
-  gain.connect(context.destination);
+  current.connect(dialogueHighpass);
+  dialogueHighpass.connect(dialogueWarmth);
+  dialogueWarmth.connect(dialoguePresence);
+  dialoguePresence.connect(dialogueCompressor);
+  dialogueCompressor.connect(adaptiveCompressor);
+  adaptiveCompressor.connect(adaptiveGain);
+  adaptiveGain.connect(gain);
+  gain.connect(limiter);
+  limiter.connect(context.destination);
   await context.resume();
 
   const session = {
@@ -113,14 +181,22 @@ async function createSession(tabId, streamId, settings) {
     frequencyData: new Uint8Array(analyser.frequencyBinCount),
     floatFrequencyData: new Float32Array(analyser.frequencyBinCount),
     previousFrequencyData: new Uint8Array(analyser.frequencyBinCount),
-    displayedLevels: [0, 0, 0, 0, 0, 0],
+    displayedLevels: EQ_FREQUENCIES.map(() => 0),
     staleSpectrumFrames: 0,
     effectBass,
     effectVoice,
     filters,
+    dialogueHighpass,
+    dialogueWarmth,
+    dialoguePresence,
+    dialogueCompressor,
+    adaptiveCompressor,
+    adaptiveGain,
     gain,
-    visualBandDb: [0, 0, 0, 0, 0, 0],
+    limiter,
+    visualBandDb: EQ_FREQUENCIES.map(() => 0),
     meterTimer: null,
+    lastSettings: null,
   };
   sessions.set(tabId, session);
   applySettings(session, settings);
@@ -203,6 +279,9 @@ function startMeter(tabId, session) {
     if (sessions.get(tabId) !== session) return;
 
     try {
+      if (session.lastSettings?.pro && Number(session.lastSettings.proValidUntil) <= Date.now() / 1000) {
+        applySettings(session, { ...session.lastSettings, pro: null, proValidUntil: 0 });
+      }
       chrome.runtime.sendMessage(
         {
           type: "ZAZ_EQ_LEVELS",
@@ -228,6 +307,11 @@ async function stopSession(tabId) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "ZAZ_OFFSCREEN_STATUS" && message.target === "offscreen") {
+    sendResponse({ ok: true, tabIds: Array.from(sessions.keys()) });
+    return false;
+  }
+
   if (message?.target !== "offscreen") return false;
 
   (async () => {

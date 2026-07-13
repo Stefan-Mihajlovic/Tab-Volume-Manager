@@ -1,9 +1,109 @@
 const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
+const TVM_INSTALLATION_ID_KEY = "tvmProInstallationId";
+const TVM_ENTITLEMENT_KEY = "tvmProEntitlement";
+const TVM_LICENSE_PUBLIC_JWK = {
+  kty: "EC",
+  x: "8Fd8yVpXuwL877LWa4AJv4gYG-km1QeQfH21XDgyp9Q",
+  y: "M74OitFNOHGF8jxQpXyEEZJ5Z5BcHGcxxB4ykIet7r8",
+  crv: "P-256",
+};
+const FREE_EQ_INDICES = new Set([0, 1, 3, 5, 7, 8]);
 
 let creatingOffscreenDocument = null;
 const tabTasks = new Map();
 const meterSubscribers = new Map();
 const latestMeterLevels = new Map();
+let entitlementCache = { checkedAt: 0, valid: false, expiresAt: 0 };
+
+function storageGet(keys) {
+  return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
+}
+
+function base64UrlToBytes(value) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function installationClaim(installationId) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(installationId));
+  return bytesToHex(new Uint8Array(digest));
+}
+
+async function verifyStoredEntitlement() {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (Date.now() - entitlementCache.checkedAt < 30000 &&
+      (!entitlementCache.valid || entitlementCache.expiresAt > nowSeconds)) {
+    return entitlementCache.valid;
+  }
+  let valid = false;
+  let expiresAt = 0;
+  try {
+    const stored = await storageGet([TVM_INSTALLATION_ID_KEY, TVM_ENTITLEMENT_KEY]);
+    const installationId = stored[TVM_INSTALLATION_ID_KEY];
+    const entitlement = stored[TVM_ENTITLEMENT_KEY];
+    const parts = entitlement?.token?.split(".") || [];
+    if (typeof installationId === "string" && parts.length === 3) {
+      const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[1])));
+      const now = Math.floor(Date.now() / 1000);
+      if (payload.exp > now && entitlement.expiresAt > now &&
+          payload.installation === await installationClaim(installationId)) {
+        const publicKey = await crypto.subtle.importKey(
+          "jwk",
+          TVM_LICENSE_PUBLIC_JWK,
+          { name: "ECDSA", namedCurve: "P-256" },
+          false,
+          ["verify"]
+        );
+        valid = await crypto.subtle.verify(
+          { name: "ECDSA", hash: "SHA-256" },
+          publicKey,
+          base64UrlToBytes(parts[2]),
+          new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
+        );
+        if (valid) expiresAt = Math.min(payload.exp, entitlement.expiresAt);
+      }
+    }
+  } catch (error) {
+    valid = false;
+  }
+  entitlementCache = { checkedAt: Date.now(), valid, expiresAt };
+  return valid;
+}
+
+function normalizeEqBands(bands) {
+  if (Array.isArray(bands) && bands.length === 6) {
+    bands = [bands[0], bands[1], 0, bands[2], 0, bands[3], 0, bands[4], bands[5], 0];
+  }
+  return Array.from({ length: 10 }, (_, index) =>
+    Math.max(-15, Math.min(15, Number(bands?.[index]) || 0))
+  );
+}
+
+async function sanitizeSettings(settings = {}) {
+  const proActive = await verifyStoredEntitlement();
+  const eqBands = normalizeEqBands(settings.eqBands);
+  return {
+    ...settings,
+    eqBands: proActive
+      ? eqBands
+      : eqBands.map((band, index) => FREE_EQ_INDICES.has(index) ? band : 0),
+    pro: proActive ? settings.pro : null,
+    proValidUntil: proActive ? entitlementCache.expiresAt : 0,
+  };
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local") return;
+  if (changes[TVM_ENTITLEMENT_KEY] || changes[TVM_INSTALLATION_ID_KEY]) {
+    entitlementCache = { checkedAt: 0, valid: false, expiresAt: 0 };
+  }
+});
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "ZAZ_METER") return;
@@ -91,12 +191,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     await ensureOffscreenDocument();
+    const settings = await sanitizeSettings(message.settings);
 
     let response = await chrome.runtime.sendMessage({
       type: "ZAZ_OFFSCREEN_UPDATE",
       target: "offscreen",
       tabId: message.tabId,
-      settings: message.settings,
+      settings,
     });
 
     if (response?.needsStream) {
@@ -109,7 +210,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         target: "offscreen",
         tabId: message.tabId,
         streamId,
-        settings: message.settings,
+        settings,
       });
     }
 
