@@ -1,5 +1,29 @@
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap");
 
+@property --volumeTrackStart {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #4a6bff;
+}
+
+@property --volumeTrackEnd {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(74, 107, 255, 0.24);
+}
+
+@property --volumeSliderThumb {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #4a6bff;
+}
+
+@property --volumeSliderShadow {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(74, 107, 255, 0.4);
+}
+
 * {
   scroll-behavior: smooth;
   box-sizing: border-box;
@@ -333,20 +357,81 @@ header h3 {
   gap: 6px;
 }
 
+.volumeReadout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.volumeDangerWarning {
+  display: inline-grid;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid rgba(255, 84, 99, 0.42);
+  border-radius: 50%;
+  background: rgba(255, 67, 84, 0.14);
+  color: #ff6574;
+  font-size: 12px;
+  line-height: 1;
+  box-shadow: 0 0 14px rgba(255, 53, 73, 0.16);
+}
+
+.volumeDangerWarning.hidden {
+  display: none;
+}
+
 .volumeValue input {
   background-color: var(--buttonColor);
   border: 1px solid var(--borderColor);
   border-radius: 10px;
   padding: 6px 8px;
-  width: 58px;
-  text-align: left;
+  width: 78px;
+  text-align: center;
   color: var(--textColor);
+}
+
+.volumeValue input::-webkit-inner-spin-button,
+.volumeValue input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 .volumeValue input:hover,
 .volumeValue input:focus {
   background-color: var(--buttonDarker);
   outline: none;
+}
+
+.volumeBlock.volumeDanger .volumeValue,
+.volumeBlock.volumeDanger .volumeValue input {
+  color: #ff6574;
+}
+
+.volumeBlock.volumeDanger .volumeValue input {
+  border-color: rgba(255, 84, 99, 0.52);
+  background: rgba(255, 67, 84, 0.1);
+  box-shadow: 0 0 0 3px rgba(255, 67, 84, 0.08);
+}
+
+#volumeSlider {
+  background: linear-gradient(
+    90deg,
+    var(--volumeTrackStart, var(--accentColor)),
+    var(--volumeTrackEnd, rgba(74, 107, 255, 0.24))
+  );
+  transition:
+    --volumeTrackStart 0.16s ease,
+    --volumeTrackEnd 0.16s ease,
+    --volumeSliderThumb 0.16s ease,
+    --volumeSliderShadow 0.16s ease;
+}
+
+#volumeSlider::-webkit-slider-thumb {
+  background: var(--volumeSliderThumb, var(--accentColor));
+  box-shadow: 0 4px 14px var(--volumeSliderShadow, rgba(74, 107, 255, 0.4));
 }
 
 .volumeValue span {
@@ -460,6 +545,23 @@ button.selected:hover {
 #resetVolume,
 .ghostButton {
   width: 100%;
+}
+
+.volumeActions {
+  display: grid;
+  grid-template-columns: 3fr 7fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.volumeActions .secondaryAction {
+  width: 100%;
+}
+
+.muteVolumeButton.muted {
+  border-color: rgba(255, 84, 99, 0.42);
+  background: rgba(255, 67, 84, 0.1);
+  color: #ff6574;
 }
 
 .secondaryAction {
@@ -1295,6 +1397,10 @@ button.presetSlot:not(:disabled):hover {
   grid-template-columns: 1fr 1fr;
   gap: 7px;
   margin-top: 8px;
+}
+
+.lifetimeLicense #proActiveState .proLicenseActions {
+  grid-template-columns: 1fr;
 }
 
 .proLicenseActions button {

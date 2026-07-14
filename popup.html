@@ -50,12 +50,15 @@
               </div>
             </div>
             <div class="intensityBlock volumeBlock">
-              <h3>Volume<span id="volumePC" class="volumeValue"><input type="number" min="0" max="500" value="100" placeholder="100">%</span></h3>
+              <h3>Volume<span class="volumeReadout"><span id="volumeDangerWarning" class="volumeDangerWarning hidden" role="img" aria-label="Extreme volume warning" title="Extreme volume can cause clipping or hearing damage">&#9888;</span><span id="volumePC" class="volumeValue"><input type="number" min="0" max="500" value="100" placeholder="100">%</span></span></h3>
               <div class="sliderInset">
                 <input type="range" id="volumeSlider" min="0" max="500" value="100">
               </div>
             </div>
-            <button id="resetVolume" class="secondaryAction">Reset volume to 100%</button>
+            <div class="volumeActions">
+              <button id="muteVolume" class="secondaryAction muteVolumeButton" type="button" aria-pressed="false">Mute</button>
+              <button id="resetVolume" class="secondaryAction" type="button">Reset volume to 100%</button>
+            </div>
           </section>
         </section>
 
@@ -153,11 +156,11 @@
               </article>
               <article class="proFeature">
                 <span class="proFeatureIcon" aria-hidden="true">&#8734;</span>
-                <div><strong>Unlimited Presets</strong><small>Save profiles for every setup</small></div>
+                <div><strong>Custom Presets</strong><small>4 with subscriptions, unlimited Lifetime</small></div>
               </article>
             </div>
 
-            <p class="proMoreFeatures">One license unlocks every Pro tool, 10-band EQ and unlimited presets.</p>
+            <p class="proMoreFeatures">Every plan unlocks all Pro tools. Lifetime also includes unlimited presets and 1500% volume boost.</p>
 
             <div class="proPricing" aria-label="Pro pricing">
               <div><strong>$2.49</strong><small>Monthly</small></div>

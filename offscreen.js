@@ -51,7 +51,8 @@ function readProTool(settings, name) {
 function applySettings(session, settings = {}) {
   const proIsCurrent = Number(settings.proValidUntil) > Date.now() / 1000;
   const effectiveSettings = proIsCurrent ? settings : { ...settings, pro: null };
-  const volume = Math.max(0, Math.min(500, Number(settings.volume) || 0));
+  const maxVolume = proIsCurrent && settings.proPlan === "lifetime" ? 1500 : 500;
+  const volume = Math.max(0, Math.min(maxVolume, Number(settings.volume) || 0));
   const amount = Math.max(0, Math.min(20, Number(settings.effectAmount) || 0));
   const mode = ["bass", "voice"].includes(settings.effectMode)
     ? settings.effectMode

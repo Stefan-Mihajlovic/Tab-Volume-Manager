@@ -4,11 +4,14 @@ const effectSlider = document.getElementById("effectSlider");
 const bassBoostBtn = document.getElementById("bassBoost");
 const voiceBoostBtn = document.getElementById("voiceBoost");
 const effectsOffBtn = document.getElementById("effectsOff");
+const muteVolumeBtn = document.getElementById("muteVolume");
 const resetVolumeBtn = document.getElementById("resetVolume");
 const resetEqualizerBtn = document.getElementById("resetEqualizer");
 const siteFavicon = document.getElementById("siteFavicon");
 const siteName = document.getElementById("siteName");
 const volumePC = document.querySelector("#volumePC input");
+const volumeBlock = document.querySelector(".volumeBlock");
+const volumeDangerWarning = document.getElementById("volumeDangerWarning");
 const effectIntensityPC = document.querySelector("#effectIntensityPC input");
 const eqSliders = Array.from(document.querySelectorAll(".eqSlider"));
 const eqLevelMeters = Array.from(document.querySelectorAll(".eqLevelMeter"));
@@ -65,6 +68,10 @@ const TVM_LICENSE_KEY = "tvmProLicenseKey";
 const TVM_INSTALLATION_ID_KEY = "tvmProInstallationId";
 const TVM_ENTITLEMENT_KEY = "tvmProEntitlement";
 const TVM_LICENSE_META_KEY = "tvmProLicenseMeta";
+const PRO_PLANS = new Set(["monthly", "yearly", "lifetime"]);
+const STANDARD_MAX_VOLUME = 500;
+const LIFETIME_MAX_VOLUME = 1500;
+const EXTREME_VOLUME_THRESHOLD = 1000;
 const TVM_API_URL = "https://tvm-licensing-api-prod.optiflowzoffice.workers.dev";
 const TVM_PRO_URL = "https://stefanmihajlovic.com/tab-volume-manager/#pro";
 const TVM_LICENSE_PUBLIC_JWK = {
@@ -84,7 +91,9 @@ let savedEqPresets = [];
 let loadedPresetName = null;
 let lastMeterUpdateAt = 0;
 let isProActive = false;
+let proPlan = null;
 let proValidUntil = 0;
+let volumeBeforeMute = 100;
 let proAudioSettings = {
   smartLimiter: { enabled: false, strength: 70 },
   adaptiveVolume: { enabled: false, strength: 50 },
@@ -102,6 +111,70 @@ function storageSet(values) {
 
 function storageRemove(keys) {
   return new Promise((resolve) => chrome.storage.local.remove(keys, resolve));
+}
+
+function normalizeProPlan(plan) {
+  return PRO_PLANS.has(plan) ? plan : null;
+}
+
+function getPresetLimit() {
+  if (!isProActive) return 1;
+  return proPlan === "lifetime" ? Infinity : 4;
+}
+
+function getMaxVolume() {
+  return isProActive && proPlan === "lifetime"
+    ? LIFETIME_MAX_VOLUME
+    : STANDARD_MAX_VOLUME;
+}
+
+function interpolateRgba(from, to, progress) {
+  const values = from.map((value, index) => value + (to[index] - value) * progress);
+  return `rgba(${Math.round(values[0])}, ${Math.round(values[1])}, ${Math.round(values[2])}, ${values[3].toFixed(3)})`;
+}
+
+function updateVolumeDangerState(value = slider.value) {
+  const dangerProgress = getMaxVolume() === LIFETIME_MAX_VOLUME
+    ? Math.max(0, Math.min(1, (Number(value) - EXTREME_VOLUME_THRESHOLD) /
+      (LIFETIME_MAX_VOLUME - EXTREME_VOLUME_THRESHOLD)))
+    : 0;
+  const isExtreme = dangerProgress > 0;
+  slider.style.setProperty(
+    "--volumeTrackStart",
+    interpolateRgba([74, 107, 255, 1], [255, 129, 95, 1], dangerProgress)
+  );
+  slider.style.setProperty(
+    "--volumeTrackEnd",
+    interpolateRgba([74, 107, 255, 0.24], [255, 48, 79, 1], dangerProgress)
+  );
+  slider.style.setProperty(
+    "--volumeSliderThumb",
+    interpolateRgba([74, 107, 255, 1], [255, 64, 88, 1], dangerProgress)
+  );
+  slider.style.setProperty(
+    "--volumeSliderShadow",
+    interpolateRgba([74, 107, 255, 0.4], [255, 48, 79, 0.48], dangerProgress)
+  );
+  volumeBlock.classList.toggle("volumeDanger", isExtreme);
+  volumeDangerWarning.classList.toggle("hidden", !isExtreme);
+}
+
+function syncMuteButton(value = slider.value) {
+  const numericValue = Number(value) || 0;
+  if (numericValue > 0) volumeBeforeMute = numericValue;
+  const muted = numericValue === 0;
+  muteVolumeBtn.textContent = muted ? "Unmute" : "Mute";
+  muteVolumeBtn.setAttribute("aria-pressed", String(muted));
+  muteVolumeBtn.classList.toggle("muted", muted);
+}
+
+function syncVolumeTierUi() {
+  const maxVolume = getMaxVolume();
+  slider.max = String(maxVolume);
+  volumePC.max = String(maxVolume);
+  const clampedValue = Math.max(0, Math.min(maxVolume, Number(slider.value) || 0));
+  slider.value = String(clampedValue);
+  updateVolumeProc();
 }
 
 function normalizeEqBands(bands) {
@@ -167,16 +240,17 @@ async function installationClaim(installationId) {
 }
 
 async function verifyEntitlement(entitlement, installationId) {
-  if (!entitlement?.token || typeof entitlement.expiresAt !== "number") return false;
+  if (!entitlement?.token || typeof entitlement.expiresAt !== "number") return null;
   const parts = entitlement.token.split(".");
-  if (parts.length !== 3) return false;
+  if (parts.length !== 3) return null;
 
   try {
     const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[1])));
     const expectedInstallation = await installationClaim(installationId);
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp <= now || entitlement.expiresAt <= now) return false;
-    if (payload.installation !== expectedInstallation) return false;
+    if (payload.exp <= now || entitlement.expiresAt <= now) return null;
+    if (payload.installation !== expectedInstallation) return null;
+    if (!normalizeProPlan(payload.plan)) return null;
 
     const publicKey = await crypto.subtle.importKey(
       "jwk",
@@ -185,14 +259,15 @@ async function verifyEntitlement(entitlement, installationId) {
       false,
       ["verify"]
     );
-    return crypto.subtle.verify(
+    const valid = await crypto.subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },
       publicKey,
       base64UrlToBytes(parts[2]),
       new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
     );
+    return valid ? payload : null;
   } catch (error) {
-    return false;
+    return null;
   }
 }
 
@@ -231,27 +306,33 @@ function setProMessage(message = "", success = false) {
 function applyProAccessState(active) {
   isProActive = Boolean(active);
   document.body.classList.toggle("proActive", isProActive);
+  document.body.classList.toggle("lifetimeLicense", isProActive && proPlan === "lifetime");
   headerProBadge.classList.toggle("hidden", !isProActive);
   proMarketingContent.classList.toggle("hidden", isProActive);
   proToolsContent.classList.toggle("hidden", !isProActive);
+  manageProButton.classList.toggle("hidden", isProActive && proPlan === "lifetime");
+  syncVolumeTierUi();
   eqBands = normalizeEqBands(eqBands);
   syncEqualizerUI();
   updateSavedPresetSlots();
-  savePresetDescription.textContent = isProActive
-    ? "Save the current 10-band equalizer settings. Pro includes unlimited presets."
-    : "Save the current six-band equalizer settings.";
+  savePresetDescription.textContent = !isProActive
+    ? "Save the current six-band equalizer settings. Free includes one preset."
+    : proPlan === "lifetime"
+      ? "Save the current 10-band equalizer settings. Lifetime includes unlimited presets."
+      : "Save the current 10-band equalizer settings. Monthly and Yearly include up to four presets.";
 
   if (isProActive) refreshMixerTabs();
   if (Number.isInteger(activeTabId)) updateAudio(slider.value);
 }
 
-function setProUiActive(license, offline = false, expiresAt = 0) {
+function setProUiActive(license, verifiedPlan, offline = false, expiresAt = 0) {
+  proPlan = normalizeProPlan(verifiedPlan);
   proValidUntil = Number(expiresAt) || 0;
   proActivationState.classList.add("hidden");
   proActiveState.classList.remove("hidden");
   proStatusBadge.textContent = "✦ Pro active";
-  const planName = license?.plan
-    ? `${license.plan.charAt(0).toUpperCase()}${license.plan.slice(1)}`
+  const planName = proPlan
+    ? `${proPlan.charAt(0).toUpperCase()}${proPlan.slice(1)}`
     : "Pro";
   const suffix = license?.lastFour ? ` •••• ${license.lastFour}` : "";
   proLicenseSummary.textContent = `${planName} license${suffix} is active on this installation.`;
@@ -260,6 +341,7 @@ function setProUiActive(license, offline = false, expiresAt = 0) {
 }
 
 function setProUiInactive(message = "") {
+  proPlan = null;
   proValidUntil = 0;
   proActiveState.classList.add("hidden");
   proActivationState.classList.remove("hidden");
@@ -298,11 +380,12 @@ async function activateProLicense() {
       installationId,
       extensionVersion: chrome.runtime.getManifest().version,
     });
-    if (!await verifyEntitlement(result.entitlement, installationId)) {
+    const entitlementPayload = await verifyEntitlement(result.entitlement, installationId);
+    if (!entitlementPayload) {
       throw new Error("The license server returned an invalid entitlement.");
     }
     await storeProAccess(licenseKey, result);
-    setProUiActive(result.license, false, result.entitlement.expiresAt);
+    setProUiActive(result.license, entitlementPayload.plan, false, result.entitlement.expiresAt);
   } catch (error) {
     const messages = {
       license_not_found: "That license key could not be found.",
@@ -331,10 +414,11 @@ async function validateStoredProLicense() {
 
   proLicenseKeyInput.value = licenseKey;
   const installationId = await ensureInstallationId();
-  const cachedIsValid = await verifyEntitlement(stored[TVM_ENTITLEMENT_KEY], installationId);
-  if (cachedIsValid) {
+  const cachedPayload = await verifyEntitlement(stored[TVM_ENTITLEMENT_KEY], installationId);
+  if (cachedPayload) {
     setProUiActive(
       stored[TVM_LICENSE_META_KEY],
+      cachedPayload.plan,
       true,
       stored[TVM_ENTITLEMENT_KEY]?.expiresAt
     );
@@ -350,15 +434,21 @@ async function validateStoredProLicense() {
         installationId,
         extensionVersion: chrome.runtime.getManifest().version,
       });
-      if (!await verifyEntitlement(result.entitlement, installationId)) {
+      const entitlementPayload = await verifyEntitlement(result.entitlement, installationId);
+      if (!entitlementPayload) {
         throw new Error("The license server returned an invalid entitlement.");
       }
       await storeProAccess(licenseKey, result);
-      setProUiActive(result.license, false, result.entitlement.expiresAt);
+      setProUiActive(result.license, entitlementPayload.plan, false, result.entitlement.expiresAt);
       return true;
     } catch (error) {
-      if ((!error.status || error.status >= 500) && cachedIsValid) {
-        setProUiActive(stored[TVM_LICENSE_META_KEY], true, stored[TVM_ENTITLEMENT_KEY]?.expiresAt);
+      if ((!error.status || error.status >= 500) && cachedPayload) {
+        setProUiActive(
+          stored[TVM_LICENSE_META_KEY],
+          cachedPayload.plan,
+          true,
+          stored[TVM_ENTITLEMENT_KEY]?.expiresAt
+        );
         return true;
       }
       await storageRemove([TVM_LICENSE_KEY, TVM_ENTITLEMENT_KEY, TVM_LICENSE_META_KEY]);
@@ -372,7 +462,7 @@ async function validateStoredProLicense() {
     }
   };
 
-  if (cachedIsValid) {
+  if (cachedPayload) {
     void validateRemotely();
     return true;
   }
@@ -620,10 +710,11 @@ function createPresetSlot(preset, sourceIndex, displayIndex) {
 function updateSavedPresetSlots() {
   if (!presetSlots) return;
   presetSlots.replaceChildren();
+  const presetLimit = getPresetLimit();
   const visiblePresets = savedEqPresets
     .map((preset, sourceIndex) => ({ preset, sourceIndex }))
     .filter(({ preset }) => isProActive || !preset.proOnly)
-    .slice(0, isProActive ? undefined : 1);
+    .slice(0, Number.isFinite(presetLimit) ? presetLimit : undefined);
   visiblePresets.forEach(({ preset, sourceIndex }, displayIndex) =>
     presetSlots.appendChild(createPresetSlot(preset, sourceIndex, displayIndex))
   );
@@ -635,11 +726,13 @@ function updateSavedPresetSlots() {
     presetSlots.appendChild(empty);
   }
 
-  if (!isProActive) {
+  const shouldShowUpgradeSlot = !isProActive ||
+    (proPlan !== "lifetime" && savedEqPresets.length >= presetLimit);
+  if (shouldShowUpgradeSlot) {
     const locked = document.createElement("div");
     locked.className = "presetSlot lockedPresetSlot";
     locked.setAttribute("aria-disabled", "true");
-    locked.innerHTML = `<span class="presetSlotNumber">∞</span><span class="presetSlotCopy"><strong>Unlimited presets</strong><small>Available with Pro</small></span><span class="presetSlotLock" aria-hidden="true">🔒</span>`;
+    locked.innerHTML = `<span class="presetSlotNumber">∞</span><span class="presetSlotCopy"><strong>${isProActive ? "Unlimited presets" : "More preset slots"}</strong><small>${isProActive ? "Available with Lifetime" : "4 with Pro, unlimited with Lifetime"}</small></span><span class="presetSlotLock" aria-hidden="true">🔒</span>`;
     presetSlots.appendChild(locked);
   }
 }
@@ -665,6 +758,7 @@ async function loadSavedPresets() {
 function setupPresetControls() {
   savePresetButton.addEventListener("click", () => {
     presetNameInput.value = loadedPresetName || (!isProActive && savedEqPresets[0]?.name) || "";
+    presetNameError.textContent = "Enter a preset name.";
     presetNameError.classList.add("hidden");
     openModal(savePresetModal);
     requestAnimationFrame(() => {
@@ -693,6 +787,12 @@ function setupPresetControls() {
         nextPreset.proOnly = savedEqPresets[existingIndex].proOnly;
         savedEqPresets[existingIndex] = nextPreset;
       } else {
+        const presetLimit = getPresetLimit();
+        if (savedEqPresets.length >= presetLimit) {
+          presetNameError.textContent = "Monthly and Yearly support up to 4 presets. Lifetime includes unlimited presets.";
+          presetNameError.classList.remove("hidden");
+          return;
+        }
         nextPreset.proOnly = savedEqPresets.some((preset) => !preset.proOnly);
         savedEqPresets.push(nextPreset);
       }
@@ -709,7 +809,10 @@ function setupPresetControls() {
     closeModal(savePresetModal);
   });
 
-  presetNameInput.addEventListener("input", () => presetNameError.classList.add("hidden"));
+  presetNameInput.addEventListener("input", () => {
+    presetNameError.textContent = "Enter a preset name.";
+    presetNameError.classList.add("hidden");
+  });
   presetNameInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") confirmSavePreset.click();
   });
@@ -792,6 +895,8 @@ function formatSiteName(hostname) {
 
 function updateVolumeProc() {
   volumePC.value = slider.value;
+  updateVolumeDangerState(slider.value);
+  syncMuteButton(slider.value);
 }
 
 function updateEffectsIntensityProc() {
@@ -928,7 +1033,8 @@ async function refreshMixerTabs() {
 
       const storedMixerVolume = Number(mixerVolumes[tab.id]);
       const defaultMixerVolume = tab.id === activeTabId ? Number(slider.value) : 100;
-      const value = Math.max(0, Math.min(500, Number.isFinite(storedMixerVolume) ? storedMixerVolume : defaultMixerVolume));
+      const maxVolume = getMaxVolume();
+      const value = Math.max(0, Math.min(maxVolume, Number.isFinite(storedMixerVolume) ? storedMixerVolume : defaultMixerVolume));
       const volumeWrap = document.createElement("label");
       volumeWrap.className = "mixerVolume";
       const output = document.createElement("output");
@@ -936,7 +1042,7 @@ async function refreshMixerTabs() {
       const input = document.createElement("input");
       input.type = "range";
       input.min = "0";
-      input.max = "500";
+      input.max = String(maxVolume);
       input.value = String(value);
       input.setAttribute("aria-label", `${name.textContent} volume`);
       input.disabled = needsConnection;
@@ -1007,7 +1113,7 @@ async function updateAudio(volume) {
   if (!tab?.id) return;
 
   const settings = {
-    volume: parseInt(volume, 10),
+    volume: Math.max(0, Math.min(getMaxVolume(), parseInt(volume, 10) || 0)),
     effectMode,
     effectAmount,
     eqBands: getEffectiveEqBands(),
@@ -1027,7 +1133,7 @@ async function updateAudio(volume) {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       world: "MAIN",
-      func: (volumeLevel, selectedEffectMode, selectedEffectAmount, customBands, proSettings) => {
+      func: (volumeLevel, selectedEffectMode, selectedEffectAmount, customBands, proSettings, entitlementExpiresAt) => {
         window.postMessage(
           {
             type: "ZAZ_VOLUME_UPDATE",
@@ -1036,11 +1142,12 @@ async function updateAudio(volume) {
             effectAmount: selectedEffectAmount,
             eqBands: customBands,
             pro: proSettings,
+            proValidUntil: entitlementExpiresAt,
           },
           "*"
         );
       },
-      args: [settings.volume, effectMode, effectAmount, settings.eqBands, settings.pro],
+      args: [settings.volume, effectMode, effectAmount, settings.eqBands, settings.pro, settings.proValidUntil],
     });
   } catch (error) {
     // Ignore pages where script injection is not allowed.
@@ -1134,8 +1241,9 @@ setInterval(() => {
 }, 200);
 
 volumePC.addEventListener("input", (e) => {
-  const value = Math.max(0, Math.min(500, parseInt(e.target.value || "0", 10)));
+  const value = Math.max(0, Math.min(getMaxVolume(), parseInt(e.target.value || "0", 10)));
   slider.value = value;
+  updateVolumeProc();
   updateAudio(value);
   savePreset(value, effectMode, effectAmount);
 });
@@ -1199,6 +1307,18 @@ resetEqualizerBtn.addEventListener("click", () => {
   syncEqualizerUI();
   updateAudio(slider.value);
   savePreset(slider.value, effectMode, effectAmount);
+});
+
+muteVolumeBtn.addEventListener("click", () => {
+  const currentVolume = Number(slider.value) || 0;
+  const nextVolume = currentVolume === 0
+    ? Math.max(1, Math.min(getMaxVolume(), volumeBeforeMute || 100))
+    : 0;
+  if (currentVolume > 0) volumeBeforeMute = currentVolume;
+  slider.value = String(nextVolume);
+  updateVolumeProc();
+  updateAudio(nextVolume);
+  savePreset(nextVolume, effectMode, effectAmount);
 });
 
 resetVolumeBtn.addEventListener("click", () => {

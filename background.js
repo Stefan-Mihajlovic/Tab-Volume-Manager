@@ -3,17 +3,18 @@ const TVM_INSTALLATION_ID_KEY = "tvmProInstallationId";
 const TVM_ENTITLEMENT_KEY = "tvmProEntitlement";
 const TVM_LICENSE_PUBLIC_JWK = {
   kty: "EC",
-  x: "8Fd8yVpXuwL877LWa4AJv4gYG-km1QeQfH21XDgyp9Q",
-  y: "M74OitFNOHGF8jxQpXyEEZJ5Z5BcHGcxxB4ykIet7r8",
+  x: "AZpnxE_j3aaAUwUkzkVbagqa-j7HoVmCbsTLglwGvgs",
+  y: "B9jdmU1uF6mSdkPwICYXfov8S5s3WeNQ_Y8susG6d9Y",
   crv: "P-256",
 };
 const FREE_EQ_INDICES = new Set([0, 1, 3, 5, 7, 8]);
+const PRO_PLANS = new Set(["monthly", "yearly", "lifetime"]);
 
 let creatingOffscreenDocument = null;
 const tabTasks = new Map();
 const meterSubscribers = new Map();
 const latestMeterLevels = new Map();
-let entitlementCache = { checkedAt: 0, valid: false, expiresAt: 0 };
+let entitlementCache = { checkedAt: 0, valid: false, expiresAt: 0, plan: null };
 
 function storageGet(keys) {
   return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
@@ -43,6 +44,7 @@ async function verifyStoredEntitlement() {
   }
   let valid = false;
   let expiresAt = 0;
+  let plan = null;
   try {
     const stored = await storageGet([TVM_INSTALLATION_ID_KEY, TVM_ENTITLEMENT_KEY]);
     const installationId = stored[TVM_INSTALLATION_ID_KEY];
@@ -51,7 +53,7 @@ async function verifyStoredEntitlement() {
     if (typeof installationId === "string" && parts.length === 3) {
       const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[1])));
       const now = Math.floor(Date.now() / 1000);
-      if (payload.exp > now && entitlement.expiresAt > now &&
+      if (payload.exp > now && entitlement.expiresAt > now && PRO_PLANS.has(payload.plan) &&
           payload.installation === await installationClaim(installationId)) {
         const publicKey = await crypto.subtle.importKey(
           "jwk",
@@ -66,13 +68,16 @@ async function verifyStoredEntitlement() {
           base64UrlToBytes(parts[2]),
           new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
         );
-        if (valid) expiresAt = Math.min(payload.exp, entitlement.expiresAt);
+        if (valid) {
+          expiresAt = Math.min(payload.exp, entitlement.expiresAt);
+          plan = payload.plan;
+        }
       }
     }
   } catch (error) {
     valid = false;
   }
-  entitlementCache = { checkedAt: Date.now(), valid, expiresAt };
+  entitlementCache = { checkedAt: Date.now(), valid, expiresAt, plan };
   return valid;
 }
 
@@ -88,12 +93,15 @@ function normalizeEqBands(bands) {
 async function sanitizeSettings(settings = {}) {
   const proActive = await verifyStoredEntitlement();
   const eqBands = normalizeEqBands(settings.eqBands);
+  const maxVolume = proActive && entitlementCache.plan === "lifetime" ? 1500 : 500;
   return {
     ...settings,
+    volume: Math.max(0, Math.min(maxVolume, Number(settings.volume) || 0)),
     eqBands: proActive
       ? eqBands
       : eqBands.map((band, index) => FREE_EQ_INDICES.has(index) ? band : 0),
     pro: proActive ? settings.pro : null,
+    proPlan: proActive ? entitlementCache.plan : null,
     proValidUntil: proActive ? entitlementCache.expiresAt : 0,
   };
 }
@@ -101,7 +109,7 @@ async function sanitizeSettings(settings = {}) {
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
   if (changes[TVM_ENTITLEMENT_KEY] || changes[TVM_INSTALLATION_ID_KEY]) {
-    entitlementCache = { checkedAt: 0, valid: false, expiresAt: 0 };
+    entitlementCache = { checkedAt: 0, valid: false, expiresAt: 0, plan: null };
   }
 });
 
