@@ -9,6 +9,9 @@ const TVM_LICENSE_PUBLIC_JWK = {
 };
 const FREE_EQ_INDICES = new Set([0, 1, 3, 5, 7, 8]);
 const PRO_PLANS = new Set(["monthly", "yearly", "lifetime"]);
+const SLEEP_TIMER_ALARM = "tvmSleepTimer";
+const SLEEP_TIMER_KEY = "tvmSleepTimerState";
+const SLEEP_FADE_DURATION_MS = 4000;
 
 let creatingOffscreenDocument = null;
 const tabTasks = new Map();
@@ -18,6 +21,14 @@ let entitlementCache = { checkedAt: 0, valid: false, expiresAt: 0, plan: null };
 
 function storageGet(keys) {
   return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
+}
+
+function storageSet(values) {
+  return new Promise((resolve) => chrome.storage.local.set(values, resolve));
+}
+
+function storageRemove(keys) {
+  return new Promise((resolve) => chrome.storage.local.remove(keys, resolve));
 }
 
 function base64UrlToBytes(value) {
@@ -189,6 +200,126 @@ async function ensureOffscreenDocument() {
 
   await creatingOffscreenDocument;
 }
+
+async function fadeAndPauseTab(tabId, durationMs) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    func: async (fadeDuration) => {
+      const manager = window.__zazVolumeManager;
+      if (manager?.contexts && manager?.nodes) {
+        manager.contexts.forEach((context) => {
+          const gain = manager.nodes.get(context)?.gain?.gain;
+          if (!gain) return;
+          const now = context.currentTime;
+          gain.cancelScheduledValues(now);
+          gain.setValueAtTime(gain.value, now);
+          gain.linearRampToValueAtTime(0, now + fadeDuration / 1000);
+        });
+      }
+      await new Promise((resolve) => setTimeout(resolve, fadeDuration));
+      document.querySelectorAll("video, audio").forEach((media) => media.pause());
+    },
+    args: [durationMs],
+  });
+}
+
+async function restoreTabGain(tabId) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    func: () => {
+      const manager = window.__zazVolumeManager;
+      if (!manager?.contexts || !manager?.nodes) return;
+      manager.contexts.forEach((context) => {
+        const gain = manager.nodes.get(context)?.gain?.gain;
+        if (!gain) return;
+        const now = context.currentTime;
+        gain.cancelScheduledValues(now);
+        gain.setValueAtTime(Number(manager.gain) || 0, now);
+      });
+    },
+  });
+}
+
+async function executeSleepTimer(timerState) {
+  const query = { audible: true };
+  if (Number.isInteger(timerState?.windowId)) query.windowId = timerState.windowId;
+  const audibleTabs = await chrome.tabs.query(query).catch(() => []);
+  const tabIds = Array.from(new Set([
+    ...(Array.isArray(timerState?.tabIds) ? timerState.tabIds : []),
+    ...audibleTabs.map((tab) => tab.id),
+  ].filter(Number.isInteger)));
+
+  const offscreenFade = chrome.runtime.sendMessage({
+    type: "ZAZ_OFFSCREEN_FADE",
+    target: "offscreen",
+    tabIds,
+    durationMs: SLEEP_FADE_DURATION_MS,
+  }).catch(() => null);
+  const pageFades = tabIds.map((tabId) => fadeAndPauseTab(tabId, SLEEP_FADE_DURATION_MS).catch(() => null));
+  await Promise.all([offscreenFade, ...pageFades]);
+  await Promise.allSettled(tabIds.map((tabId) => chrome.tabs.update(tabId, { muted: true })));
+  await Promise.allSettled([
+    chrome.runtime.sendMessage({
+      type: "ZAZ_OFFSCREEN_RESTORE",
+      target: "offscreen",
+      tabIds,
+    }),
+    ...tabIds.map((tabId) => restoreTabGain(tabId)),
+  ]);
+  await storageRemove(SLEEP_TIMER_KEY);
+}
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name !== SLEEP_TIMER_ALARM) return;
+  storageGet(SLEEP_TIMER_KEY)
+    .then((stored) => {
+      const timerState = stored[SLEEP_TIMER_KEY];
+      if (!timerState) return null;
+      return executeSleepTimer(timerState);
+    })
+    .catch(() => storageRemove(SLEEP_TIMER_KEY));
+});
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!["ZAZ_SLEEP_TIMER_SET", "ZAZ_SLEEP_TIMER_CANCEL", "ZAZ_SLEEP_TIMER_GET"].includes(message?.type)) {
+    return false;
+  }
+
+  (async () => {
+    if (message.type === "ZAZ_SLEEP_TIMER_GET") {
+      const stored = await storageGet(SLEEP_TIMER_KEY);
+      const timer = stored[SLEEP_TIMER_KEY];
+      const active = Number(timer?.endsAt) > Date.now();
+      return { ok: true, active, endsAt: active ? timer.endsAt : 0 };
+    }
+
+    if (message.type === "ZAZ_SLEEP_TIMER_CANCEL") {
+      await chrome.alarms.clear(SLEEP_TIMER_ALARM);
+      await storageRemove(SLEEP_TIMER_KEY);
+      return { ok: true };
+    }
+
+    if (!await verifyStoredEntitlement()) {
+      throw new Error("Sleep Timer requires an active Pro license.");
+    }
+    const durationMinutes = Math.max(1, Math.min(10080, Math.round(Number(message.durationMinutes) || 0)));
+    const endsAt = Date.now() + durationMinutes * 60000;
+    const timerState = {
+      endsAt,
+      windowId: Number.isInteger(message.windowId) ? message.windowId : null,
+      tabIds: Array.isArray(message.tabIds) ? message.tabIds.filter(Number.isInteger) : [],
+    };
+    await storageSet({ [SLEEP_TIMER_KEY]: timerState });
+    await chrome.alarms.create(SLEEP_TIMER_ALARM, { when: endsAt });
+    return { ok: true, endsAt };
+  })()
+    .then(sendResponse)
+    .catch((error) => sendResponse({ ok: false, error: error.message }));
+
+  return true;
+});
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== "ZAZ_CAPTURE_TAB") return false;

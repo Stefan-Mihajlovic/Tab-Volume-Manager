@@ -60,6 +60,28 @@ const movieDialogueStrength = document.getElementById("movieDialogueStrength");
 const movieDialogueValue = document.getElementById("movieDialogueValue");
 const refreshMixerButton = document.getElementById("refreshMixerButton");
 const mixerTabList = document.getElementById("mixerTabList");
+const mixerSettingsModal = document.getElementById("mixerSettingsModal");
+const mixerModalFavicon = document.getElementById("mixerModalFavicon");
+const mixerModalName = document.getElementById("mixerModalName");
+const mixerModalTitle = document.getElementById("mixerModalTitle");
+const mixerModalVolumeSlider = document.getElementById("mixerModalVolumeSlider");
+const mixerModalVolumeValue = document.getElementById("mixerModalVolumeValue");
+const mixerModalMessage = document.getElementById("mixerModalMessage");
+const applyCurrentSettingsButton = document.getElementById("applyCurrentSettingsButton");
+const sleepTimerSection = document.getElementById("sleepTimerSection");
+const sleepTimerBody = document.getElementById("sleepTimerBody");
+const sleepTimerOptions = document.getElementById("sleepTimerOptions");
+const sleepTimerStatus = document.getElementById("sleepTimerStatus");
+const sleepTimerBadge = document.getElementById("sleepTimerBadge");
+const sleepTimerCountdown = document.getElementById("sleepTimerCountdown");
+const sleepTimerMessage = document.getElementById("sleepTimerMessage");
+const cancelSleepTimerButton = document.getElementById("cancelSleepTimerButton");
+const customSleepTimerButton = document.getElementById("customSleepTimerButton");
+const customSleepTimerModal = document.getElementById("customSleepTimerModal");
+const customSleepHours = document.getElementById("customSleepHours");
+const customSleepMinutes = document.getElementById("customSleepMinutes");
+const customSleepTimerError = document.getElementById("customSleepTimerError");
+const confirmCustomSleepTimer = document.getElementById("confirmCustomSleepTimer");
 const EQ_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 const FREE_EQ_INDICES = new Set([0, 1, 3, 5, 7, 8]);
 const EQ_DEFAULTS = EQ_FREQUENCIES.map(() => 0);
@@ -105,6 +127,11 @@ let proAudioSettings = {
   movieDialogue: { enabled: false, strength: 60 },
 };
 let mixerVolumes = {};
+let selectedMixerTab = null;
+let selectedMixerRow = null;
+let sleepTimerEndsAt = 0;
+let sleepTimerInterval = null;
+let sleepTimerResizeTimer = null;
 
 function storageGet(keys) {
   return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
@@ -876,7 +903,7 @@ function setupPresetControls() {
     });
   });
 
-  [savePresetModal, loadPresetModal, transferLicenseModal].forEach((modal) => {
+  [savePresetModal, loadPresetModal, transferLicenseModal, mixerSettingsModal, customSleepTimerModal].forEach((modal) => {
     modal.addEventListener("click", (event) => {
       if (event.target === modal) closeModal(modal);
     });
@@ -887,6 +914,8 @@ function setupPresetControls() {
     closeModal(savePresetModal);
     closeModal(loadPresetModal);
     closeModal(transferLicenseModal);
+    closeModal(mixerSettingsModal);
+    closeModal(customSleepTimerModal);
   });
 }
 
@@ -1033,11 +1062,84 @@ async function applyMixerVolume(tab, volume) {
     effectMode: siteSettings.effectMode || "none",
     effectAmount: Number.isFinite(savedEffectAmount) ? savedEffectAmount : 10,
     eqBands: getEffectiveEqBands(siteSettings.eqBands),
-    pro: getEffectiveProSettings(),
+    pro: isProActive
+      ? normalizeProAudioSettings(siteSettings.proAudio || proAudioSettings)
+      : getEffectiveProSettings(),
     proValidUntil,
   };
   const result = await sendSettingsToTab(tab.id, settings);
   if (!result?.ok) throw new Error(result?.error || "This tab could not be connected.");
+}
+
+function setMixerModalMessage(message = "", success = false) {
+  mixerModalMessage.textContent = message;
+  mixerModalMessage.classList.toggle("hidden", !message);
+  mixerModalMessage.classList.toggle("success", success);
+}
+
+function updateSelectedMixerVolume(value) {
+  const nextVolume = Math.max(0, Math.min(getMaxVolume(), Number(value) || 0));
+  mixerModalVolumeSlider.value = String(nextVolume);
+  mixerModalVolumeValue.textContent = `${nextVolume}%`;
+  selectedMixerRow?.querySelector(".mixerSettingsValue")?.replaceChildren(`${nextVolume}%`);
+  return nextVolume;
+}
+
+function openMixerSettings(tab, row, value) {
+  selectedMixerTab = tab;
+  selectedMixerRow = row;
+  mixerModalFavicon.src = tab.favIconUrl || "icons/icon32.png";
+  mixerModalName.textContent = tabDisplayName(tab);
+  mixerModalTitle.textContent = tab.title || "Playing audio";
+  mixerModalVolumeSlider.max = String(getMaxVolume());
+  updateSelectedMixerVolume(value);
+  setMixerModalMessage();
+  openModal(mixerSettingsModal);
+  requestAnimationFrame(() => mixerModalVolumeSlider.focus());
+}
+
+async function applyCurrentSettingsToMixerTab() {
+  if (!selectedMixerTab?.id) return;
+  const settings = {
+    volume: Math.max(0, Math.min(getMaxVolume(), Number(slider.value) || 0)),
+    effectMode,
+    effectAmount,
+    eqBands: getEffectiveEqBands(),
+    pro: getEffectiveProSettings(),
+    proValidUntil,
+  };
+
+  applyCurrentSettingsButton.disabled = true;
+  setMixerModalMessage("Applying current tab settings…");
+  try {
+    const result = await sendSettingsToTab(selectedMixerTab.id, settings);
+    if (!result?.ok) throw new Error(result?.error || "This tab could not be connected.");
+
+    mixerVolumes[selectedMixerTab.id] = settings.volume;
+    const valuesToStore = { [PRO_MIXER_VOLUMES_KEY]: mixerVolumes };
+    try {
+      const hostname = new URL(selectedMixerTab.url).hostname;
+      valuesToStore[hostname] = {
+        volume: settings.volume,
+        effectMode: settings.effectMode,
+        effectAmount: settings.effectAmount,
+        eqBands: normalizeEqBands(settings.eqBands),
+        eqPresetName: loadedPresetName,
+        proAudio: normalizeProAudioSettings(proAudioSettings),
+      };
+    } catch (error) {
+      // Restricted pages can still receive captured audio settings.
+    }
+    await storageSet(valuesToStore);
+    updateSelectedMixerVolume(settings.volume);
+    if (selectedMixerTab.id === activeTabId) updateVolumeProc();
+    setMixerModalMessage("Current volume, effects and EQ applied.", true);
+  } catch (error) {
+    selectedMixerRow?.classList.add("mixerError");
+    setMixerModalMessage(error.message);
+  } finally {
+    applyCurrentSettingsButton.disabled = false;
+  }
 }
 
 async function refreshMixerTabs() {
@@ -1088,34 +1190,23 @@ async function refreshMixerTabs() {
       const defaultMixerVolume = tab.id === activeTabId ? Number(slider.value) : 100;
       const maxVolume = getMaxVolume();
       const value = Math.max(0, Math.min(maxVolume, Number.isFinite(storedMixerVolume) ? storedMixerVolume : defaultMixerVolume));
-      const volumeWrap = document.createElement("label");
-      volumeWrap.className = "mixerVolume";
-      const output = document.createElement("output");
-      output.textContent = `${value}%`;
-      const input = document.createElement("input");
-      input.type = "range";
-      input.min = "0";
-      input.max = String(maxVolume);
-      input.value = String(value);
-      input.setAttribute("aria-label", `${name.textContent} volume`);
-      input.disabled = needsConnection;
-      input.addEventListener("input", () => {
-        const nextVolume = Number(input.value);
-        output.textContent = `${nextVolume}%`;
-        mixerVolumes[tab.id] = nextVolume;
-        storageSet({ [PRO_MIXER_VOLUMES_KEY]: mixerVolumes });
-        row.classList.remove("mixerError");
-        applyMixerVolume(tab, nextVolume).catch((error) => {
-          row.classList.add("mixerError");
-          row.title = error.message;
-        });
-        if (tab.id === activeTabId) {
-          slider.value = String(nextVolume);
-          updateVolumeProc();
-        }
-      });
-      volumeWrap.append(output, input);
-      row.append(identity, volumeWrap);
+      const settingsButton = document.createElement("button");
+      settingsButton.className = "mixerSettingsButton";
+      settingsButton.type = "button";
+      settingsButton.disabled = needsConnection;
+      settingsButton.setAttribute("aria-label", `Open settings for ${name.textContent}`);
+      const settingsLabel = document.createElement("span");
+      settingsLabel.textContent = "Settings";
+      const settingsValue = document.createElement("small");
+      settingsValue.className = "mixerSettingsValue";
+      settingsValue.textContent = `${value}%`;
+      const chevron = document.createElement("span");
+      chevron.className = "mixerSettingsChevron";
+      chevron.setAttribute("aria-hidden", "true");
+      chevron.textContent = "›";
+      settingsButton.append(settingsLabel, settingsValue, chevron);
+      settingsButton.addEventListener("click", () => openMixerSettings(tab, row, Number(mixerVolumes[tab.id] ?? value)));
+      row.append(identity, settingsButton);
       mixerTabList.appendChild(row);
     });
   } finally {
@@ -1128,6 +1219,187 @@ function animateMixerRefresh() {
   void refreshMixerButton.offsetWidth;
   refreshMixerButton.classList.add("refreshing");
   window.setTimeout(() => refreshMixerButton.classList.remove("refreshing"), 620);
+}
+
+function formatSleepTimerRemaining(milliseconds) {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+    : `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function resizeSleepTimerBody(mutator, animate = true) {
+  const currentHeight = sleepTimerBody.getBoundingClientRect().height;
+  window.clearTimeout(sleepTimerResizeTimer);
+  sleepTimerResizeTimer = null;
+  sleepTimerBody.classList.remove("isResizing");
+  sleepTimerBody.style.height = "auto";
+  mutator();
+  const targetHeight = sleepTimerBody.getBoundingClientRect().height;
+
+  if (!animate || Math.abs(currentHeight - targetHeight) < 1) return;
+  sleepTimerBody.style.height = `${currentHeight}px`;
+  void sleepTimerBody.offsetHeight;
+  sleepTimerBody.classList.add("isResizing");
+  requestAnimationFrame(() => {
+    sleepTimerBody.style.height = `${targetHeight}px`;
+  });
+  sleepTimerResizeTimer = window.setTimeout(() => {
+    sleepTimerBody.classList.remove("isResizing");
+    sleepTimerBody.style.height = "auto";
+    sleepTimerResizeTimer = null;
+  }, 360);
+}
+
+function renderSleepTimer(animate = true) {
+  const active = sleepTimerEndsAt > Date.now();
+  resizeSleepTimerBody(() => {
+    sleepTimerOptions.classList.toggle("hidden", active);
+    sleepTimerStatus.classList.toggle("hidden", !active);
+    sleepTimerBadge.classList.toggle("hidden", !active);
+    sleepTimerSection.classList.toggle("enabled", active);
+    if (active) sleepTimerCountdown.textContent = formatSleepTimerRemaining(sleepTimerEndsAt - Date.now());
+  }, animate);
+
+  window.clearInterval(sleepTimerInterval);
+  sleepTimerInterval = active
+    ? window.setInterval(() => {
+        if (sleepTimerEndsAt <= Date.now()) {
+          sleepTimerEndsAt = 0;
+          renderSleepTimer(true);
+          return;
+        }
+        sleepTimerCountdown.textContent = formatSleepTimerRemaining(sleepTimerEndsAt - Date.now());
+      }, 1000)
+    : null;
+}
+
+function setSleepTimerMessage(message = "", success = false, animate = true) {
+  resizeSleepTimerBody(() => {
+    sleepTimerMessage.textContent = message;
+    sleepTimerMessage.classList.toggle("hidden", !message);
+    sleepTimerMessage.classList.toggle("success", success);
+  }, animate);
+}
+
+function sleepTimerErrorMessage(error) {
+  const message = String(error?.message || "");
+  if (/receiving end|message port|cannot read properties of undefined|alarms/i.test(message)) {
+    return "Reload Tab Volume Manager in chrome://extensions to finish enabling Sleep Timer.";
+  }
+  return message || "The sleep timer could not be started.";
+}
+
+async function startSleepTimer(totalMinutes) {
+  const durationMinutes = Math.max(1, Math.min(10080, Math.round(Number(totalMinutes) || 0)));
+  const buttons = Array.from(sleepTimerOptions.querySelectorAll("button"));
+  buttons.forEach((button) => { button.disabled = true; });
+  if (!chrome.alarms) {
+    buttons.forEach((button) => { button.disabled = false; });
+    setSleepTimerMessage("Reload Tab Volume Manager in chrome://extensions to finish enabling Sleep Timer.");
+    return;
+  }
+  setSleepTimerMessage("Preparing audible tabs for a smooth fade…");
+
+  try {
+    const tabs = await chrome.tabs.query({ audible: true, currentWindow: true });
+    if (tabs.length === 0) {
+      setSleepTimerMessage("No audio is playing right now. The timer will still start and stop audio that is playing when it ends.");
+    }
+    await Promise.allSettled(tabs.map((tab) => {
+      const storedVolume = Number(mixerVolumes[tab.id]);
+      const fallbackVolume = tab.id === activeTabId ? Number(slider.value) : 100;
+      return applyMixerVolume(tab, Number.isFinite(storedVolume) ? storedVolume : fallbackVolume);
+    }));
+    const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const targetTabIds = Array.from(new Set(tabs.map((tab) => tab.id)));
+    const result = await chrome.runtime.sendMessage({
+      type: "ZAZ_SLEEP_TIMER_SET",
+      durationMinutes,
+      windowId: currentTab?.windowId,
+      tabIds: targetTabIds,
+    });
+    if (!result) {
+      throw new Error("Reload Tab Volume Manager in chrome://extensions to finish enabling Sleep Timer.");
+    }
+    if (!result.ok) throw new Error(result.error || "The sleep timer could not be started.");
+    sleepTimerEndsAt = Number(result.endsAt) || (Date.now() + durationMinutes * 60000);
+    renderSleepTimer(true);
+    const durationLabel = durationMinutes < 60
+      ? `${durationMinutes} minutes`
+      : durationMinutes === 60
+        ? "1 hour"
+        : formatSleepTimerRemaining(durationMinutes * 60000);
+    const noAudioNote = tabs.length === 0
+      ? " No audio is playing yet; anything playing when the timer ends will still be stopped."
+      : "";
+    setSleepTimerMessage(`Timer set for ${durationLabel}.${noAudioNote}`, true);
+    window.setTimeout(() => setSleepTimerMessage(), 2600);
+  } catch (error) {
+    setSleepTimerMessage(sleepTimerErrorMessage(error));
+  } finally {
+    buttons.forEach((button) => { button.disabled = false; });
+  }
+}
+
+async function cancelSleepTimer() {
+  cancelSleepTimerButton.disabled = true;
+  try {
+    const result = await chrome.runtime.sendMessage({ type: "ZAZ_SLEEP_TIMER_CANCEL" });
+    if (!result?.ok) throw new Error(result?.error || "The sleep timer could not be cancelled.");
+    sleepTimerEndsAt = 0;
+    renderSleepTimer(true);
+    setSleepTimerMessage("Sleep timer cancelled.", true);
+    window.setTimeout(() => setSleepTimerMessage(), 2200);
+  } catch (error) {
+    setSleepTimerMessage(error.message);
+  } finally {
+    cancelSleepTimerButton.disabled = false;
+  }
+}
+
+async function syncSleepTimerState() {
+  try {
+    const result = await chrome.runtime.sendMessage({ type: "ZAZ_SLEEP_TIMER_GET" });
+    sleepTimerEndsAt = result?.active ? Number(result.endsAt) || 0 : 0;
+  } catch (error) {
+    sleepTimerEndsAt = 0;
+  }
+  renderSleepTimer(false);
+}
+
+function setupSleepTimer() {
+  sleepTimerOptions.querySelectorAll("[data-sleep-minutes]").forEach((button) => {
+    button.addEventListener("click", () => startSleepTimer(Number(button.dataset.sleepMinutes)));
+  });
+  customSleepTimerButton.addEventListener("click", () => {
+    customSleepTimerError.classList.add("hidden");
+    openModal(customSleepTimerModal);
+    requestAnimationFrame(() => customSleepHours.focus());
+  });
+  confirmCustomSleepTimer.addEventListener("click", () => {
+    const hours = Math.max(0, Math.min(168, Number(customSleepHours.value) || 0));
+    const minutes = Math.max(0, Math.min(59, Number(customSleepMinutes.value) || 0));
+    const totalMinutes = Math.round(hours * 60 + minutes);
+    if (totalMinutes < 1) {
+      customSleepTimerError.classList.remove("hidden");
+      customSleepMinutes.focus();
+      return;
+    }
+    closeModal(customSleepTimerModal);
+    startSleepTimer(totalMinutes);
+  });
+  [customSleepHours, customSleepMinutes].forEach((input) => {
+    input.addEventListener("input", () => customSleepTimerError.classList.add("hidden"));
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") confirmCustomSleepTimer.click();
+    });
+  });
+  cancelSleepTimerButton.addEventListener("click", cancelSleepTimer);
+  syncSleepTimerState();
 }
 
 async function setupProTools() {
@@ -1144,6 +1416,25 @@ async function setupProTools() {
     animateMixerRefresh();
     refreshMixerTabs();
   });
+  mixerModalVolumeSlider.addEventListener("input", () => {
+    if (!selectedMixerTab?.id) return;
+    const nextVolume = updateSelectedMixerVolume(mixerModalVolumeSlider.value);
+    mixerVolumes[selectedMixerTab.id] = nextVolume;
+    storageSet({ [PRO_MIXER_VOLUMES_KEY]: mixerVolumes });
+    selectedMixerRow?.classList.remove("mixerError");
+    setMixerModalMessage();
+    applyMixerVolume(selectedMixerTab, nextVolume).catch((error) => {
+      selectedMixerRow?.classList.add("mixerError");
+      setMixerModalMessage(error.message);
+    });
+    if (selectedMixerTab.id === activeTabId) {
+      slider.value = String(nextVolume);
+      updateVolumeProc();
+      savePreset(nextVolume, effectMode, effectAmount);
+    }
+  });
+  applyCurrentSettingsButton.addEventListener("click", applyCurrentSettingsToMixerTab);
+  setupSleepTimer();
 }
 
 function savePreset(volume, mode, amount, bands = eqBands) {

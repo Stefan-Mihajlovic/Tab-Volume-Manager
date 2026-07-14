@@ -307,6 +307,35 @@ async function stopSession(tabId) {
   await session.context.close().catch(() => {});
 }
 
+async function fadeSessions(tabIds, durationMs) {
+  const targetIds = new Set(Array.isArray(tabIds) ? tabIds : []);
+  const duration = Math.max(250, Math.min(10000, Number(durationMs) || 4000));
+  const fadedSessions = [];
+
+  sessions.forEach((session, tabId) => {
+    if (!targetIds.has(tabId)) return;
+    const now = session.context.currentTime;
+    session.gain.gain.cancelScheduledValues(now);
+    session.gain.gain.setValueAtTime(session.gain.gain.value, now);
+    session.gain.gain.linearRampToValueAtTime(0, now + duration / 1000);
+    fadedSessions.push(session);
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, duration));
+  return fadedSessions.length;
+}
+
+function restoreSessions(tabIds) {
+  const targetIds = new Set(Array.isArray(tabIds) ? tabIds : []);
+  let restoredCount = 0;
+  sessions.forEach((session, tabId) => {
+    if (!targetIds.has(tabId) || !session.lastSettings) return;
+    applySettings(session, session.lastSettings);
+    restoredCount += 1;
+  });
+  return restoredCount;
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "ZAZ_OFFSCREEN_STATUS" && message.target === "offscreen") {
     sendResponse({ ok: true, tabIds: Array.from(sessions.keys()) });
@@ -319,6 +348,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "ZAZ_OFFSCREEN_STOP") {
       await stopSession(message.tabId);
       return { ok: true };
+    }
+
+    if (message.type === "ZAZ_OFFSCREEN_FADE") {
+      const fadedCount = await fadeSessions(message.tabIds, message.durationMs);
+      return { ok: true, fadedCount };
+    }
+
+    if (message.type === "ZAZ_OFFSCREEN_RESTORE") {
+      return { ok: true, restoredCount: restoreSessions(message.tabIds) };
     }
 
     if (message.type !== "ZAZ_OFFSCREEN_UPDATE") return { ok: false };

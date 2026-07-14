@@ -189,6 +189,27 @@
                 <div id="mixerTabList" class="mixerTabList"><p class="mixerEmpty">Open another audible tab, then refresh.</p></div>
               </section>
 
+              <section id="sleepTimerSection" class="proToolSection sleepTimerSection">
+                <div class="proToolHeader">
+                  <span class="proFeatureIcon sleepTimerIcon" aria-hidden="true">&#9790;</span>
+                  <div><strong>Sleep Timer</strong><small>Gently fade out, mute and pause every audible tab.</small></div>
+                  <span id="sleepTimerBadge" class="sleepTimerBadge hidden">Active</span>
+                </div>
+                <div id="sleepTimerBody" class="sleepTimerBody">
+                  <div id="sleepTimerOptions" class="sleepTimerOptions" aria-label="Sleep timer duration">
+                    <button type="button" data-sleep-minutes="15">15 min</button>
+                    <button type="button" data-sleep-minutes="30">30 min</button>
+                    <button type="button" data-sleep-minutes="60">1 hour</button>
+                    <button id="customSleepTimerButton" type="button">Custom</button>
+                  </div>
+                  <div id="sleepTimerStatus" class="sleepTimerStatus hidden" role="status">
+                    <div><span>Audio turns off in</span><strong id="sleepTimerCountdown">15:00</strong></div>
+                    <button id="cancelSleepTimerButton" type="button">Cancel timer</button>
+                  </div>
+                  <p id="sleepTimerMessage" class="sleepTimerMessage hidden" role="status"></p>
+                </div>
+              </section>
+
               <section class="proToolSection" data-pro-tool="smartLimiter">
                 <div class="proToolHeader">
                   <span class="proFeatureIcon" aria-hidden="true">&#9889;</span>
@@ -324,6 +345,54 @@
           <div class="modalActions">
             <button type="button" data-close-modal="transferLicenseModal">Cancel</button>
             <button id="confirmTransferButton" class="modalPrimary" type="button">Confirm transfer</button>
+          </div>
+        </section>
+      </div>
+
+      <div id="mixerSettingsModal" class="modalBackdrop hidden" role="dialog" aria-modal="true" aria-labelledby="mixerSettingsTitle">
+        <section class="modalPanel mixerSettingsPanel">
+          <div class="modalHeader">
+            <div>
+              <span class="sectionEyebrow">Mixer tab</span>
+              <h3 id="mixerSettingsTitle" class="modalTitle">Tab settings</h3>
+            </div>
+            <button class="modalClose" type="button" data-close-modal="mixerSettingsModal" aria-label="Close tab settings dialog">&times;</button>
+          </div>
+          <div class="mixerModalIdentity">
+            <img id="mixerModalFavicon" src="icons/icon32.png" alt="">
+            <div><strong id="mixerModalName">Audio tab</strong><small id="mixerModalTitle">Playing audio</small></div>
+          </div>
+          <label class="mixerModalVolume" for="mixerModalVolumeSlider">
+            <span>Volume</span>
+            <output id="mixerModalVolumeValue">100%</output>
+            <input id="mixerModalVolumeSlider" type="range" min="0" max="500" value="100">
+          </label>
+          <p id="mixerModalMessage" class="sleepTimerMessage hidden" role="status"></p>
+          <button id="applyCurrentSettingsButton" class="applyCurrentSettingsButton" type="button">
+            <span>Apply current settings</span>
+            <small>Copy volume, effects and EQ from the current tab</small>
+          </button>
+        </section>
+      </div>
+
+      <div id="customSleepTimerModal" class="modalBackdrop hidden" role="dialog" aria-modal="true" aria-labelledby="customSleepTimerTitle">
+        <section class="modalPanel">
+          <div class="modalHeader">
+            <div>
+              <span class="sectionEyebrow">Custom duration</span>
+              <h3 id="customSleepTimerTitle" class="modalTitle">Set sleep timer</h3>
+            </div>
+            <button class="modalClose" type="button" data-close-modal="customSleepTimerModal" aria-label="Close custom sleep timer dialog">&times;</button>
+          </div>
+          <p class="modalDescription">Choose how long audio should keep playing before it gently fades out.</p>
+          <div class="customTimeFields">
+            <label for="customSleepHours"><span>Hours</span><input id="customSleepHours" type="number" min="0" max="168" value="0" inputmode="numeric"></label>
+            <label for="customSleepMinutes"><span>Minutes</span><input id="customSleepMinutes" type="number" min="0" max="59" value="45" inputmode="numeric"></label>
+          </div>
+          <p id="customSleepTimerError" class="fieldError hidden">Set a duration of at least one minute.</p>
+          <div class="modalActions">
+            <button type="button" data-close-modal="customSleepTimerModal">Cancel</button>
+            <button id="confirmCustomSleepTimer" class="modalPrimary" type="button">Start timer</button>
           </div>
         </section>
       </div>

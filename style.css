@@ -1716,6 +1716,283 @@ button.presetSlot:not(:disabled):hover {
   height: 6px;
 }
 
+.mixerSettingsButton {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 7px 8px 7px 10px;
+  border: 1px solid rgba(132, 111, 255, 0.3);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(129, 95, 255, 0.15), rgba(74, 107, 255, 0.08));
+  color: var(--textColor);
+  font-size: 9.5px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.mixerSettingsButton:hover {
+  border-color: rgba(132, 111, 255, 0.55);
+  background: linear-gradient(135deg, rgba(129, 95, 255, 0.24), rgba(74, 107, 255, 0.13));
+}
+
+.mixerSettingsButton:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.mixerSettingsButton small {
+  color: #b7c3ff;
+  font-size: 8.5px;
+  font-weight: 600;
+}
+
+.mixerSettingsChevron {
+  color: var(--mutedText);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.sleepTimerIcon {
+  font-size: 20px !important;
+  font-weight: 500 !important;
+}
+
+.sleepTimerBadge {
+  padding: 4px 7px;
+  border: 1px solid rgba(88, 214, 148, 0.34);
+  border-radius: 999px;
+  background: rgba(50, 190, 118, 0.1);
+  color: #78e3aa;
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sleepTimerBody {
+  display: flow-root;
+}
+
+.sleepTimerBody.isResizing {
+  overflow: hidden;
+  transition: height 0.32s cubic-bezier(0.22, 0.72, 0.24, 1);
+}
+
+.sleepTimerOptions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid var(--borderColor);
+}
+
+.sleepTimerOptions button {
+  min-height: 36px;
+  padding: 7px 4px;
+  border: 1px solid var(--borderColor);
+  border-radius: 10px;
+  background: var(--panelSecondary);
+  color: var(--textColor);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.sleepTimerOptions button:hover {
+  border-color: rgba(132, 111, 255, 0.55);
+  background: rgba(126, 96, 255, 0.14);
+}
+
+.sleepTimerOptions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.sleepTimerStatus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid var(--borderColor);
+}
+
+.sleepTimerOptions.hidden,
+.sleepTimerStatus.hidden {
+  display: none;
+}
+
+.sleepTimerStatus > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sleepTimerStatus span {
+  color: var(--mutedText);
+  font-size: 9px;
+}
+
+.sleepTimerStatus strong {
+  color: #cec5ff;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.sleepTimerStatus button {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 115, 137, 0.3);
+  border-radius: 9px;
+  background: rgba(255, 93, 119, 0.08);
+  color: #ff9aab;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.sleepTimerMessage {
+  margin-top: 9px;
+  color: #ff9eae;
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.sleepTimerMessage.success {
+  color: #78e3aa;
+}
+
+.mixerModalIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid var(--borderColor);
+  border-radius: 12px;
+  background: var(--panelSecondary);
+}
+
+.mixerModalIdentity img {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.mixerModalIdentity > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mixerModalIdentity strong,
+.mixerModalIdentity small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mixerModalIdentity strong {
+  font-size: 11.5px;
+}
+
+.mixerModalIdentity small {
+  margin-top: 2px;
+  color: var(--mutedText);
+  font-size: 9.5px;
+}
+
+.mixerModalVolume {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mixerModalVolume > span,
+.mixerModalVolume output {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mixerModalVolume output {
+  color: #b7c3ff;
+  font-variant-numeric: tabular-nums;
+}
+
+.mixerModalVolume input {
+  grid-column: 1 / -1;
+  height: 7px;
+}
+
+.applyCurrentSettingsButton {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  margin-top: 15px;
+  padding: 11px 12px;
+  border: 1px solid rgba(132, 111, 255, 0.42);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(129, 95, 255, 0.25), rgba(74, 107, 255, 0.18));
+  text-align: left;
+}
+
+.applyCurrentSettingsButton span {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.applyCurrentSettingsButton small {
+  margin-top: 2px;
+  color: #b7c3ff;
+  font-size: 9px;
+}
+
+.applyCurrentSettingsButton:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.customTimeFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.customTimeFields label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.customTimeFields span {
+  color: var(--mutedText);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.customTimeFields input {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid var(--borderColor);
+  border-radius: 10px;
+  outline: none;
+  background: var(--panelSecondary);
+  color: var(--textColor);
+  font-size: 12px;
+}
+
+.customTimeFields input:focus {
+  border-color: var(--accentColor);
+  box-shadow: 0 0 0 3px rgba(74, 107, 255, 0.14);
+}
+
 .mixerEmpty {
   padding: 12px;
   border: 1px dashed var(--borderColor);
@@ -1846,6 +2123,39 @@ button.presetSlot:not(:disabled):hover {
 
 .lightTheme .mixerConnectionNote {
   color: #314db2 !important;
+}
+
+.lightTheme .mixerSettingsButton,
+.lightTheme .applyCurrentSettingsButton {
+  border-color: rgba(84, 66, 181, 0.32);
+  background: linear-gradient(135deg, #eeeaff, #edf1ff);
+}
+
+.lightTheme .mixerSettingsButton:hover,
+.lightTheme .applyCurrentSettingsButton:hover {
+  border-color: rgba(84, 66, 181, 0.5);
+  background: linear-gradient(135deg, #e5dfff, #e4eaff);
+}
+
+.lightTheme .mixerSettingsButton small,
+.lightTheme .mixerModalVolume output,
+.lightTheme .applyCurrentSettingsButton small {
+  color: #4258ad;
+}
+
+.lightTheme .sleepTimerBadge {
+  border-color: rgba(10, 119, 67, 0.38);
+  background: #def4e8;
+  color: #087241;
+}
+
+.lightTheme .sleepTimerStatus strong {
+  color: #523bac;
+}
+
+.lightTheme .sleepTimerMessage.success {
+  color: #087241;
+  font-weight: 700;
 }
 
 .lightTheme .miniSwitch span {
@@ -2098,5 +2408,9 @@ button.presetSlot:not(:disabled):hover {
   .proWelcomeCelebration.isVisible .proWelcomeContent {
     opacity: 1;
     transform: none;
+  }
+
+  .sleepTimerBody.isResizing {
+    transition: none;
   }
 }
