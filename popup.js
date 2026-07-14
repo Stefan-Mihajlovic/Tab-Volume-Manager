@@ -37,6 +37,10 @@ const proActiveState = document.getElementById("proActiveState");
 const proLicenseKeyInput = document.getElementById("proLicenseKeyInput");
 const proLicenseMessage = document.getElementById("proLicenseMessage");
 const proLicenseSummary = document.getElementById("proLicenseSummary");
+const proWelcomeCelebration = document.getElementById("proWelcomeCelebration");
+const proWelcomePlan = document.getElementById("proWelcomePlan");
+const proWelcomeDescription = document.getElementById("proWelcomeDescription");
+const dismissProWelcome = document.getElementById("dismissProWelcome");
 const activateProButton = document.getElementById("activateProButton");
 const getProButton = document.getElementById("getProButton");
 const manageProButton = document.getElementById("manageProButton");
@@ -93,6 +97,7 @@ let lastMeterUpdateAt = 0;
 let isProActive = false;
 let proPlan = null;
 let proValidUntil = 0;
+let proWelcomeTimer = null;
 let volumeBeforeMute = 100;
 let proAudioSettings = {
   smartLimiter: { enabled: false, strength: 70 },
@@ -303,6 +308,39 @@ function setProMessage(message = "", success = false) {
   proLicenseMessage.classList.toggle("success", success);
 }
 
+function hideProWelcome() {
+  if (proWelcomeCelebration.classList.contains("hidden") ||
+      proWelcomeCelebration.classList.contains("isLeaving")) return;
+  window.clearTimeout(proWelcomeTimer);
+  proWelcomeTimer = null;
+  proWelcomeCelebration.classList.remove("isVisible");
+  proWelcomeCelebration.classList.add("isLeaving");
+  window.setTimeout(() => {
+    proWelcomeCelebration.classList.add("hidden");
+    proWelcomeCelebration.classList.remove("isLeaving", "lifetimeWelcome");
+    (proPlan === "lifetime" ? transferProButton : manageProButton).focus();
+  }, 320);
+}
+
+function showProWelcome(plan) {
+  const verifiedPlan = normalizeProPlan(plan) || "monthly";
+  const planName = `${verifiedPlan.charAt(0).toUpperCase()}${verifiedPlan.slice(1)}`;
+  const isLifetime = verifiedPlan === "lifetime";
+  proWelcomePlan.textContent = `${planName} Pro`;
+  proWelcomeDescription.textContent = isLifetime
+    ? "Unlimited presets and the 1500% boost are ready."
+    : "Every Pro tool and four preset slots are ready.";
+  proWelcomeCelebration.classList.toggle("lifetimeWelcome", isLifetime);
+  proWelcomeCelebration.classList.remove("hidden", "isLeaving");
+  void proWelcomeCelebration.offsetWidth;
+  proWelcomeCelebration.classList.add("isVisible");
+  window.clearTimeout(proWelcomeTimer);
+  proWelcomeTimer = window.setTimeout(hideProWelcome, 7000);
+  window.setTimeout(() => {
+    if (!proWelcomeCelebration.classList.contains("hidden")) dismissProWelcome.focus();
+  }, 620);
+}
+
 function applyProAccessState(active) {
   isProActive = Boolean(active);
   document.body.classList.toggle("proActive", isProActive);
@@ -386,6 +424,7 @@ async function activateProLicense() {
     }
     await storeProAccess(licenseKey, result);
     setProUiActive(result.license, entitlementPayload.plan, false, result.entitlement.expiresAt);
+    showProWelcome(entitlementPayload.plan);
   } catch (error) {
     const messages = {
       license_not_found: "That license key could not be found.",
@@ -555,6 +594,20 @@ function setupProLicensing() {
   transferProButton.addEventListener("click", openLicenseTransfer);
   copyTransferLicenseButton.addEventListener("click", copyTransferLicense);
   confirmTransferButton.addEventListener("click", confirmLicenseTransfer);
+  dismissProWelcome.addEventListener("click", hideProWelcome);
+  proWelcomeCelebration.addEventListener("click", (event) => {
+    if (event.target === proWelcomeCelebration) hideProWelcome();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Tab" && !proWelcomeCelebration.classList.contains("hidden")) {
+      event.preventDefault();
+      dismissProWelcome.focus();
+      return;
+    }
+    if (event.key === "Escape" && !proWelcomeCelebration.classList.contains("hidden")) {
+      hideProWelcome();
+    }
+  });
 }
 
 function applyTheme(theme) {

@@ -1861,6 +1861,219 @@ button.presetSlot:not(:disabled):hover {
   opacity: 0.66;
 }
 
+.proWelcomeCelebration {
+  position: fixed;
+  z-index: 240;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 20px;
+  opacity: 0;
+  background:
+    linear-gradient(145deg, rgba(84, 76, 210, 0.26), transparent 42%),
+    radial-gradient(ellipse at 78% 74%, rgba(74, 107, 255, 0.3), transparent 46%),
+    rgba(12, 15, 28, 0.84);
+  backdrop-filter: blur(12px) saturate(120%);
+  transition: opacity 0.32s ease;
+}
+
+.proWelcomeCelebration.hidden {
+  display: none;
+}
+
+.proWelcomeCelebration.isVisible {
+  opacity: 1;
+}
+
+.proWelcomeCelebration.isLeaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.proWelcomeCelebration::before,
+.proWelcomeCelebration::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  filter: blur(18px);
+  animation: proWelcomeDrift 6s ease-in-out infinite alternate;
+}
+
+.proWelcomeCelebration::before {
+  top: 5%;
+  right: -38%;
+  width: 118%;
+  height: 34%;
+  border-radius: 38px;
+  background: linear-gradient(90deg, transparent, rgba(133, 99, 255, 0.24), rgba(74, 107, 255, 0.08));
+  transform: rotate(-18deg);
+}
+
+.proWelcomeCelebration::after {
+  bottom: 7%;
+  left: -42%;
+  width: 116%;
+  height: 30%;
+  border-radius: 42px;
+  background: linear-gradient(90deg, rgba(74, 107, 255, 0.13), rgba(138, 97, 255, 0.2), transparent);
+  transform: rotate(14deg);
+  animation-delay: -2.4s;
+}
+
+.proWelcomeContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 330px;
+  padding: 20px;
+  text-align: center;
+  transform: translateY(18px) scale(0.84, 0.9);
+  opacity: 0;
+}
+
+.proWelcomeCelebration.isVisible .proWelcomeContent {
+  animation: proWelcomeContentIn 0.78s cubic-bezier(0.18, 1.35, 0.3, 1) 0.06s forwards;
+}
+
+.proWelcomePlan {
+  color: #9e91ff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.proWelcomeEmblem {
+  position: relative;
+  display: grid;
+  width: 78px;
+  height: 78px;
+  margin: 0 0 13px;
+  place-items: center;
+}
+
+.proWelcomeHalo,
+.proWelcomeRing {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.proWelcomeHalo {
+  background: radial-gradient(circle, rgba(150, 116, 255, 0.62), rgba(91, 88, 255, 0.1) 52%, transparent 70%);
+  filter: blur(6px);
+  animation: proWelcomePulse 2.6s ease-in-out infinite;
+}
+
+.proWelcomeRing {
+  inset: 9px;
+  border: 1px solid rgba(214, 204, 255, 0.5);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(153, 117, 255, 0.34), rgba(69, 99, 255, 0.2));
+  box-shadow: inset 0 0 24px rgba(183, 166, 255, 0.14), 0 0 28px rgba(105, 86, 255, 0.28);
+  animation: proWelcomeEmblemBreathe 2.7s ease-in-out infinite;
+}
+
+.proWelcomeSpark {
+  position: relative;
+  z-index: 2;
+  color: #ffffff;
+  font-size: 30px;
+  text-shadow: 0 0 18px rgba(232, 226, 255, 0.8);
+  animation: proWelcomeSpark 1.8s ease-in-out infinite;
+}
+
+.proWelcomeContent h2 {
+  margin-top: 8px;
+  color: #ffffff;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.proWelcomeContent p {
+  max-width: 280px;
+  margin-top: 9px;
+  color: #bcb8dc;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.proWelcomeButton {
+  width: min(240px, 100%);
+  margin-top: 22px;
+  padding: 11px 14px;
+  border: 1px solid rgba(211, 204, 255, 0.3);
+  background: linear-gradient(135deg, #845cff, #4a6bff);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 10px 26px rgba(83, 75, 220, 0.34);
+}
+
+.proWelcomeButton:hover {
+  background: linear-gradient(135deg, #916dff, #5b79ff);
+  transform: translateY(-2px);
+}
+
+.lifetimeWelcome .proWelcomePlan {
+  color: #8fa4ff;
+}
+
+.lightTheme .proWelcomeCelebration {
+  background:
+    linear-gradient(145deg, rgba(104, 91, 225, 0.2), transparent 42%),
+    radial-gradient(ellipse at 78% 74%, rgba(74, 107, 255, 0.2), transparent 46%),
+    rgba(232, 236, 248, 0.88);
+}
+
+.lightTheme .proWelcomePlan {
+  color: #6f5ec5;
+}
+
+.lightTheme .proWelcomeContent h2 {
+  color: #171927;
+}
+
+.lightTheme .proWelcomeContent p {
+  color: #66708a;
+}
+
+.lightTheme .lifetimeWelcome .proWelcomePlan {
+  color: #526de2;
+}
+
+@keyframes proWelcomeContentIn {
+  0% { opacity: 0; transform: translateY(18px) scale(0.84, 0.9); }
+  48% { opacity: 1; transform: translateY(-3px) scale(1.035, 0.985); }
+  72% { opacity: 1; transform: translateY(1px) scale(0.99, 1.018); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes proWelcomeDrift {
+  from { translate: -2% -3%; scale: 0.96; }
+  to { translate: 4% 5%; scale: 1.05; }
+}
+
+@keyframes proWelcomePulse {
+  0%, 100% { opacity: 0.72; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes proWelcomeEmblemBreathe {
+  0%, 100% { transform: scale(0.94); border-radius: 22px; }
+  50% { transform: scale(1.04); border-radius: 27px 19px 25px 20px; }
+}
+
+@keyframes proWelcomeSpark {
+  0%, 100% { transform: scale(0.9) rotate(-6deg); }
+  50% { transform: scale(1.12) rotate(5deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto;
@@ -1870,5 +2083,20 @@ button.presetSlot:not(:disabled):hover {
   .iconAction.refreshing svg,
   #proPanel:not(.hidden) .proOrb {
     animation: none;
+  }
+
+  .proWelcomeCelebration,
+  .proWelcomeCelebration::before,
+  .proWelcomeCelebration::after,
+  .proWelcomeCelebration *,
+  .proWelcomeCelebration *::before,
+  .proWelcomeCelebration *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .proWelcomeCelebration.isVisible .proWelcomeContent {
+    opacity: 1;
+    transform: none;
   }
 }
