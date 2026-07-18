@@ -1,0 +1,33 @@
+Tab Volume Manager Proprietary License
+
+Copyright (c) 2025-2026 Stefan Mihajlovic. All rights reserved.
+
+Tab Volume Manager and all source code, object code, documentation, artwork,
+branding, and other materials contained in this repository (collectively,
+the "Software") are proprietary to the copyright holder.
+
+No license or permission is granted to any person or entity to use, copy,
+modify, merge, publish, distribute, sublicense, sell, rent, lease, host,
+relicense, disclose, reverse engineer, decompile, create derivative works
+from, or otherwise exploit the Software, in whole or in part, for any
+purpose, whether commercial or non-commercial, without prior express written
+permission from the copyright holder.
+
+Making this repository publicly accessible does not grant any rights beyond
+those strictly required for viewing and forking the repository through
+GitHub's functionality under the GitHub Terms of Service. No permission is
+granted to use a fork, reproduce the Software outside GitHub, distribute it,
+or create or distribute modified versions.
+
+Any separately distributed official release of Tab Volume Manager may be used
+only under the end-user terms supplied with that release, if any. Such use
+does not grant access to or rights in the source code and does not permit
+modification, redistribution, resale, or creation of derivative works.
+
+THE SOFTWARE IS PROVIDED "AS IS," WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING
+FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+All rights not expressly granted are reserved by the copyright holder.
