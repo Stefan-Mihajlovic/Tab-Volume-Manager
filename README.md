@@ -31,7 +31,7 @@ Tab Volume Manager is a browser audio workspace for controlling and enhancing th
 - Four custom presets with Monthly or Yearly
 - Unlimited presets and volume boost up to 1500% with Lifetime
 
-Pro is available for $2.49 monthly, $14.99 yearly, or $29.99 lifetime. Every plan unlocks the complete Pro audio suite; Lifetime also includes unlimited presets and the extended volume range.
+Pro is available for $1.49 monthly, $9.99 yearly, or $19.99 lifetime. Every plan unlocks the complete Pro audio suite; Lifetime also includes unlimited presets and the extended volume range.
 
 Settings and presets stay in local extension storage. Tab audio is captured and processed only while Tab Volume Manager is active, and Pro licenses are verified through the licensing service.
 
