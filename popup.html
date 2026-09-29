@@ -104,6 +104,17 @@
             </div>
 
             <div class="equalizerBoard">
+              <svg id="eqSpectrum" class="eqSpectrum" aria-hidden="true" focusable="false" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="eqSpectrumFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#8199ff" stop-opacity="0.42" />
+                    <stop offset="100%" stop-color="#4a6bff" stop-opacity="0.03" />
+                  </linearGradient>
+                </defs>
+                <path class="eqSpectrumArea" fill="url(#eqSpectrumFill)" />
+                <path class="eqSpectrumGlow" />
+                <path class="eqSpectrumLine" />
+              </svg>
               <div class="eqGrid">
                 <label class="eqBand"><output id="eqValue0">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="0" min="-15" max="15" value="0" aria-label="Sub Bass, 32 Hz"></span><strong>32 Hz</strong><small>Sub Bass</small></label>
                 <label class="eqBand"><output id="eqValue1">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="1" min="-15" max="15" value="0" aria-label="Bass, 64 Hz"></span><strong>64 Hz</strong><small>Bass</small></label>
@@ -186,7 +197,13 @@
                 <label class="proStrengthControl" for="stereoBalance"><span>Left / right balance</span><output id="stereoBalanceValue">Center</output><input id="stereoBalance" type="range" min="-100" max="100" value="0"></label>
                 <label class="proStrengthControl" for="stereoWidth"><span>Stereo width</span><output id="stereoWidthValue">100%</output><input id="stereoWidth" type="range" min="0" max="200" value="100"></label>
                 <p class="stereoHint">0% mono · 100% original · 200% wide</p>
-                <div class="stereoActions"><label><input id="stereoSwap" type="checkbox"> Swap left and right</label><button id="resetStereoButton" type="button">Reset</button></div>
+                <div class="stereoActions">
+                  <div class="stereoSwapRow">
+                    <label id="stereoSwapLabel" for="stereoSwap">Swap left and right</label>
+                    <label class="miniSwitch" aria-label="Swap left and right"><input id="stereoSwap" type="checkbox" aria-labelledby="stereoSwapLabel"><span></span></label>
+                  </div>
+                  <button id="resetStereoButton" class="secondaryAction" type="button">Reset Stereo</button>
+                </div>
               </section>
 
               <section class="proToolSection mixerSection">

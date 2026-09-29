@@ -15,6 +15,10 @@ const volumeDangerWarning = document.getElementById("volumeDangerWarning");
 const effectIntensityPC = document.querySelector("#effectIntensityPC input");
 const eqSliders = Array.from(document.querySelectorAll(".eqSlider"));
 const eqLevelMeters = Array.from(document.querySelectorAll(".eqLevelMeter"));
+const eqSpectrum = document.getElementById("eqSpectrum");
+const eqSpectrumArea = eqSpectrum.querySelector(".eqSpectrumArea");
+const eqSpectrumLines = eqSpectrum.querySelectorAll(".eqSpectrumGlow, .eqSpectrumLine");
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const tabButtons = Array.from(document.querySelectorAll(".tabButton"));
 const tabPanels = Array.from(document.querySelectorAll(".tabPanel"));
 const presetStatus = document.getElementById("presetStatus");
@@ -121,6 +125,11 @@ let eqBands = [...EQ_DEFAULTS];
 let savedEqPresets = [];
 let loadedPresetName = null;
 let lastMeterUpdateAt = 0;
+let spectrumFrame = 0;
+let spectrumFrameTime = 0;
+let spectrumGeometry = null;
+const spectrumTargets = EQ_FREQUENCIES.map(() => 0);
+const spectrumLevels = EQ_FREQUENCIES.map(() => 0);
 let isProActive = false;
 let proPlan = null;
 let proValidUntil = 0;
@@ -685,6 +694,14 @@ function setActiveTab(tabName, save = true) {
     panel.classList.toggle("hidden", panel.dataset.panel !== validTab);
   });
 
+  if (validTab === "equalizer") {
+    measureSpectrum();
+    startSpectrum();
+  } else {
+    cancelAnimationFrame(spectrumFrame);
+    spectrumFrame = 0;
+  }
+
   if (save) chrome.storage.local.set({ [ACTIVE_TAB_KEY]: validTab });
 }
 
@@ -732,9 +749,83 @@ function applyMeterLevels(message) {
   lastMeterUpdateAt = Date.now();
   eqLevelMeters.forEach((meter, index) => {
     const level = Math.max(0, Math.min(100, Number(message.levels[index]) || 0));
+    spectrumTargets[index] = level;
     meter.style.setProperty("--level", `${level}%`);
   });
+  startSpectrum();
 }
+
+function measureSpectrum() {
+  const board = eqSpectrum.parentElement;
+  const bounds = board.getBoundingClientRect();
+  const rails = eqLevelMeters.map((meter, index) => ({ index, bounds: meter.parentElement.getBoundingClientRect() }))
+    .filter((rail) => rail.bounds.height > 0);
+  if (!rails.length || !board.clientWidth) {
+    spectrumGeometry = null;
+    return;
+  }
+  const height = rails[0].bounds.height;
+  const width = board.clientWidth;
+  spectrumGeometry = {
+    width, height,
+    bands: rails.map((rail) => ({ index: rail.index, x: rail.bounds.left + rail.bounds.width / 2 - bounds.left - board.clientLeft })),
+  };
+  eqSpectrum.style.top = `${rails[0].bounds.top - bounds.top - board.clientTop}px`;
+  eqSpectrum.style.height = `${height}px`;
+  eqSpectrum.setAttribute("viewBox", `0 0 ${width} ${height}`);
+}
+
+function startSpectrum() {
+  if (spectrumFrame || document.hidden || document.getElementById("equalizerPanel").classList.contains("hidden")) return;
+  if (!spectrumGeometry) measureSpectrum();
+  if (!spectrumGeometry) return;
+  spectrumFrameTime = performance.now();
+  spectrumFrame = requestAnimationFrame(renderSpectrum);
+}
+
+function renderSpectrum(time) {
+  spectrumFrame = 0;
+  if (document.hidden || !spectrumGeometry) return;
+  const stale = Date.now() - lastMeterUpdateAt > 500;
+  const elapsed = Math.min(64, time - spectrumFrameTime);
+  spectrumFrameTime = time;
+  let moving = false;
+  spectrumLevels.forEach((level, index) => {
+    const target = stale ? 0 : spectrumTargets[index];
+    const blend = reducedMotion.matches ? 1 : 1 - Math.exp(-elapsed / (target > level ? 65 : 150));
+    spectrumLevels[index] = Math.abs(target - level) < 0.05 ? target : level + (target - level) * blend;
+    moving ||= spectrumLevels[index] > 0.05;
+    if (stale) eqLevelMeters[index].style.setProperty("--level", "0%");
+  });
+
+  const { width, height, bands } = spectrumGeometry;
+  const points = bands.map(({ index, x }) => ({ x, y: height * (1 - spectrumLevels[index] / 100) }));
+  // Horizontal tangents join band levels smoothly without overshooting their peaks.
+  let curve = `M 0 ${points[0].y}`;
+  let previous = { x: 0, y: points[0].y };
+  for (const point of [...points, { x: width, y: points[points.length - 1].y }]) {
+    const middle = (previous.x + point.x) / 2;
+    curve += ` C ${middle} ${previous.y}, ${middle} ${point.y}, ${point.x} ${point.y}`;
+    previous = point;
+  }
+  eqSpectrumArea.setAttribute("d", `${curve} L ${width} ${height} L 0 ${height} Z`);
+  eqSpectrumLines.forEach((line) => line.setAttribute("d", curve));
+  eqSpectrum.style.opacity = moving ? "1" : "0";
+  if (moving || (!stale && spectrumTargets.some((level) => level > 0))) {
+    spectrumFrame = requestAnimationFrame(renderSpectrum);
+  }
+}
+
+new ResizeObserver(() => {
+  measureSpectrum();
+  startSpectrum();
+}).observe(eqSpectrum.parentElement.querySelector(".eqGrid"));
+
+document.addEventListener("visibilitychange", () => {
+  cancelAnimationFrame(spectrumFrame);
+  spectrumFrame = 0;
+  if (!document.hidden) startSpectrum();
+});
 
 function clearLoadedPreset() {
   loadedPresetName = null;

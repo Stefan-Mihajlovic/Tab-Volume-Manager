@@ -629,6 +629,7 @@ button.selected:hover {
 }
 
 .equalizerBoard {
+  position: relative;
   display: block;
   padding: 14px 6px 12px;
   border: 1px solid var(--borderColor);
@@ -639,6 +640,7 @@ button.selected:hover {
 }
 
 .eqGrid {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 2px;
@@ -2418,7 +2420,14 @@ button.presetSlot:not(:disabled):hover {
 /* Lifetime pricing and stereo controls. */
 .proPricing { grid-template-columns: 1fr; }
 .stereoHint { margin: 8px 0 12px; color: var(--mutedText); font-size: 11px; }
-.stereoActions { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
-.stereoActions label { display: flex; align-items: center; gap: 7px; }
-.stereoActions button { padding: 6px 12px; border: 1px solid var(--borderColor); border-radius: 8px; background: transparent; color: var(--textColor); cursor: pointer; }
-.stereoActions :disabled { opacity: .45; cursor: default; }
+.stereoActions { display: grid; gap: 12px; }
+.stereoSwapRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--borderColor); }
+.stereoSwapRow > label:first-child { color: var(--textColor); font-size: 11px; font-weight: 600; cursor: pointer; }
+.stereoActions .secondaryAction { width: 100%; margin: 0; }
+.stereoActions button:disabled, .stereoActions input:disabled + span { opacity: .45; cursor: default; }
+.miniSwitch input:focus-visible + span { outline: 2px solid var(--accentColor); outline-offset: 3px; }
+.eqSpectrum { position: absolute; left: 0; width: 100%; height: 154px; pointer-events: none; overflow: hidden; }
+.eqSpectrumGlow, .eqSpectrumLine { fill: none; stroke: #829aff; stroke-linecap: round; stroke-linejoin: round; }
+.eqSpectrumGlow { stroke-width: 8px; opacity: .3; filter: blur(5px); }
+.eqSpectrumLine { stroke-width: 1.5px; opacity: .65; }
+.lightTheme .eqSpectrumLine { stroke: var(--accentColor); opacity: .5; }
