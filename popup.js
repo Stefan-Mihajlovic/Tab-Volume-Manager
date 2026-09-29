@@ -104,7 +104,7 @@ const STANDARD_MAX_VOLUME = 500;
 const LIFETIME_MAX_VOLUME = 1500;
 const EXTREME_VOLUME_THRESHOLD = 1000;
 const TVM_API_URL = "https://tvm-licensing-api-prod.optiflowzoffice.workers.dev";
-const TVM_PRO_URL = "https://stefanmihajlovic.com/tab-volume-manager/#pro";
+const TVM_PRO_URL = "https://stefanmihajlovic.com/tab-volume-manager/#pricing";
 const TVM_LICENSE_PUBLIC_JWK = {
   kty: "EC",
   x: "AZpnxE_j3aaAUwUkzkVbagqa-j7HoVmCbsTLglwGvgs",

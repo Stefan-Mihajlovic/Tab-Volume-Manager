@@ -51,3 +51,34 @@ test("Offscreen processing rejects stereo controls without a current Pro entitle
   vm.runInContext("applySettings(session, settings)", context);
   assert.deepEqual(session.stereo.matrix.map((n) => n.gain.value), [1, 0, 0, 1]);
 });
+
+test("Page audio contexts created after settings arrive restore stereo, and expiry bypasses it", () => {
+  const parameter = () => ({ value: 0, setTargetAtTime(value) { this.value = value; } });
+  class AudioNode {
+    constructor(context) {
+      this.context = context;
+      for (const key of ["gain", "frequency", "Q", "threshold", "knee", "ratio", "attack", "release"]) this[key] = parameter();
+    }
+    connect() {}
+  }
+  class AudioContext {
+    constructor() { this.currentTime = 0; this.destination = new AudioNode(this); }
+    createGain() { return new AudioNode(this); }
+    createBiquadFilter() { return new AudioNode(this); }
+    createDynamicsCompressor() { return new AudioNode(this); }
+    createChannelSplitter() { return new AudioNode(this); }
+    createChannelMerger() { return new AudioNode(this); }
+  }
+  let messageHandler;
+  let expiryHandler;
+  const window = { AudioContext, addEventListener(type, handler) { messageHandler = handler; } };
+  const context = vm.createContext({ window, AudioNode, document: { readyState: "loading", addEventListener() {} }, setTimeout(fn) { expiryHandler = fn; return 1; }, clearTimeout() {} });
+  vm.runInContext(fs.readFileSync(`${__dirname}/../stereo.js`, "utf8"), context);
+  vm.runInContext(fs.readFileSync(`${__dirname}/../content.js`, "utf8"), context);
+  messageHandler({ data: { type: "ZAZ_VOLUME_UPDATE", volume: 100, effectAmount: 0, proValidUntil: Date.now() / 1000 + 60, pro: { stereo: { enabled: true, swap: true } } } });
+  const audio = new window.AudioContext();
+  const chain = window.__zazVolumeManager.nodes.get(audio);
+  assert.deepEqual(Array.from(chain.stereo.matrix, (n) => n.gain.value), [0, 1, 1, 0]);
+  expiryHandler();
+  assert.deepEqual(Array.from(chain.stereo.matrix, (n) => n.gain.value), [1, 0, 0, 1]);
+});

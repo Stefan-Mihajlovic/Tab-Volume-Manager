@@ -184,6 +184,7 @@
 
       ctx.__zazDestination = chain.effectBass;
       ctx.__realDestination = ctx.destination;
+      applySettings();
 
       return ctx;
     }
