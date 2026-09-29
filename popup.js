@@ -58,6 +58,11 @@ const adaptiveVolumeValue = document.getElementById("adaptiveVolumeValue");
 const movieDialogueToggle = document.getElementById("movieDialogueToggle");
 const movieDialogueStrength = document.getElementById("movieDialogueStrength");
 const movieDialogueValue = document.getElementById("movieDialogueValue");
+const stereoToggle = document.getElementById("stereoToggle");
+const stereoBalance = document.getElementById("stereoBalance");
+const stereoWidth = document.getElementById("stereoWidth");
+const stereoSwap = document.getElementById("stereoSwap");
+const resetStereoButton = document.getElementById("resetStereoButton");
 const refreshMixerButton = document.getElementById("refreshMixerButton");
 const mixerTabList = document.getElementById("mixerTabList");
 const mixerSettingsModal = document.getElementById("mixerSettingsModal");
@@ -151,11 +156,11 @@ function normalizeProPlan(plan) {
 
 function getPresetLimit() {
   if (!isProActive) return 1;
-  return proPlan === "lifetime" ? Infinity : 4;
+  return Infinity;
 }
 
 function getMaxVolume() {
-  return isProActive && proPlan === "lifetime"
+  return isProActive
     ? LIFETIME_MAX_VOLUME
     : STANDARD_MAX_VOLUME;
 }
@@ -241,6 +246,7 @@ function normalizeProAudioSettings(settings) {
     smartLimiter: normalizeProTool(settings?.smartLimiter, { strength: 70 }),
     adaptiveVolume: normalizeProTool(settings?.adaptiveVolume, { strength: 50 }),
     movieDialogue: normalizeProTool(settings?.movieDialogue, { strength: 60 }),
+    stereo: TvmStereo.normalize(settings?.stereo),
   };
 }
 
@@ -250,6 +256,7 @@ function getEffectiveProSettings() {
       smartLimiter: { enabled: false, strength: 0 },
       adaptiveVolume: { enabled: false, strength: 0 },
       movieDialogue: { enabled: false, strength: 0 },
+      stereo: TvmStereo.normalize(null),
     };
   }
   return normalizeProAudioSettings(proAudioSettings);
@@ -354,9 +361,7 @@ function showProWelcome(plan) {
   const planName = `${verifiedPlan.charAt(0).toUpperCase()}${verifiedPlan.slice(1)}`;
   const isLifetime = verifiedPlan === "lifetime";
   proWelcomePlan.textContent = `${planName} Pro`;
-  proWelcomeDescription.textContent = isLifetime
-    ? "Unlimited presets and the 1500% boost are ready."
-    : "Every Pro tool and four preset slots are ready.";
+  proWelcomeDescription.textContent = "Stereo tools, unlimited presets and the 1500% boost are ready.";
   proWelcomeCelebration.classList.toggle("lifetimeWelcome", isLifetime);
   proWelcomeCelebration.classList.remove("hidden", "isLeaving");
   void proWelcomeCelebration.offsetWidth;
@@ -371,20 +376,19 @@ function showProWelcome(plan) {
 function applyProAccessState(active) {
   isProActive = Boolean(active);
   document.body.classList.toggle("proActive", isProActive);
-  document.body.classList.toggle("lifetimeLicense", isProActive && proPlan === "lifetime");
+  document.body.classList.toggle("lifetimeLicense", isProActive);
   headerProBadge.classList.toggle("hidden", !isProActive);
   proMarketingContent.classList.toggle("hidden", isProActive);
   proToolsContent.classList.toggle("hidden", !isProActive);
   manageProButton.classList.toggle("hidden", isProActive && proPlan === "lifetime");
   syncVolumeTierUi();
+  syncStereoUI();
   eqBands = normalizeEqBands(eqBands);
   syncEqualizerUI();
   updateSavedPresetSlots();
   savePresetDescription.textContent = !isProActive
     ? "Save the current six-band equalizer settings. Free includes one preset."
-    : proPlan === "lifetime"
-      ? "Save the current 10-band equalizer settings. Lifetime includes unlimited presets."
-      : "Save the current 10-band equalizer settings. Monthly and Yearly include up to four presets.";
+    : "Save the current 10-band equalizer settings. Pro includes unlimited presets.";
 
   if (isProActive) refreshMixerTabs();
   if (Number.isInteger(activeTabId)) updateAudio(slider.value);
@@ -806,13 +810,12 @@ function updateSavedPresetSlots() {
     presetSlots.appendChild(empty);
   }
 
-  const shouldShowUpgradeSlot = !isProActive ||
-    (proPlan !== "lifetime" && savedEqPresets.length >= presetLimit);
+  const shouldShowUpgradeSlot = !isProActive;
   if (shouldShowUpgradeSlot) {
     const locked = document.createElement("div");
     locked.className = "presetSlot lockedPresetSlot";
     locked.setAttribute("aria-disabled", "true");
-    locked.innerHTML = `<span class="presetSlotNumber">∞</span><span class="presetSlotCopy"><strong>${isProActive ? "Unlimited presets" : "More preset slots"}</strong><small>${isProActive ? "Available with Lifetime" : "4 with Pro, unlimited with Lifetime"}</small></span><span class="presetSlotLock" aria-hidden="true">🔒</span>`;
+    locked.innerHTML = `<span class="presetSlotNumber">∞</span><span class="presetSlotCopy"><strong>${isProActive ? "Unlimited presets" : "More preset slots"}</strong><small>Unlimited with Pro</small></span><span class="presetSlotLock" aria-hidden="true">🔒</span>`;
     presetSlots.appendChild(locked);
   }
 }
@@ -869,7 +872,7 @@ function setupPresetControls() {
       } else {
         const presetLimit = getPresetLimit();
         if (savedEqPresets.length >= presetLimit) {
-          presetNameError.textContent = "Monthly and Yearly support up to 4 presets. Lifetime includes unlimited presets.";
+          presetNameError.textContent = "Pro includes unlimited presets.";
           presetNameError.classList.remove("hidden");
           return;
         }
@@ -1001,6 +1004,7 @@ function syncEqualizerUI() {
 }
 
 function syncProToolsUI() {
+  syncStereoUI();
   const controls = [
     [smartLimiterToggle, smartLimiterStrength, smartLimiterValue, proAudioSettings.smartLimiter],
     [adaptiveVolumeToggle, adaptiveVolumeStrength, adaptiveVolumeValue, proAudioSettings.adaptiveVolume],
@@ -1012,6 +1016,38 @@ function syncProToolsUI() {
     sliderControl.disabled = !settings.enabled;
     output.textContent = `${settings.strength}%`;
     toggle.closest(".proToolSection")?.classList.toggle("enabled", settings.enabled);
+  });
+}
+
+function syncStereoUI() {
+  const stereo = TvmStereo.normalize(proAudioSettings.stereo);
+  stereoToggle.checked = stereo.enabled;
+  stereoBalance.value = stereo.balance;
+  stereoWidth.value = stereo.width;
+  stereoSwap.checked = stereo.swap;
+  [stereoBalance, stereoWidth, stereoSwap, resetStereoButton].forEach((control) => {
+    control.disabled = !isProActive || !stereo.enabled;
+  });
+  document.getElementById("stereoBalanceValue").textContent = stereo.balance === 0
+    ? "Center" : `${Math.abs(stereo.balance)}% ${stereo.balance < 0 ? "left" : "right"}`;
+  document.getElementById("stereoWidthValue").textContent = `${stereo.width}%`;
+  document.getElementById("stereoToolsSection").classList.toggle("enabled", stereo.enabled);
+}
+
+function bindStereoTools() {
+  [[stereoToggle, "enabled"], [stereoBalance, "balance"], [stereoWidth, "width"], [stereoSwap, "swap"]].forEach(([control, key]) => {
+    control.addEventListener(control.type === "range" ? "input" : "change", () => {
+      if (!isProActive) return;
+      proAudioSettings.stereo[key] = control.type === "checkbox" ? control.checked : Number(control.value);
+      syncStereoUI();
+      persistProAudioSettings();
+    });
+  });
+  resetStereoButton.addEventListener("click", () => {
+    if (!isProActive) return;
+    proAudioSettings.stereo = TvmStereo.normalize({ enabled: true });
+    syncStereoUI();
+    persistProAudioSettings();
   });
 }
 
@@ -1412,6 +1448,7 @@ async function setupProTools() {
   bindProTool(smartLimiterToggle, smartLimiterStrength, smartLimiterValue, "smartLimiter");
   bindProTool(adaptiveVolumeToggle, adaptiveVolumeStrength, adaptiveVolumeValue, "adaptiveVolume");
   bindProTool(movieDialogueToggle, movieDialogueStrength, movieDialogueValue, "movieDialogue");
+  bindStereoTools();
   refreshMixerButton.addEventListener("click", () => {
     animateMixerRefresh();
     refreshMixerTabs();

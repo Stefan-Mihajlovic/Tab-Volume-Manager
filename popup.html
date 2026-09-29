@@ -156,16 +156,15 @@
               </article>
               <article class="proFeature">
                 <span class="proFeatureIcon" aria-hidden="true">&#8734;</span>
-                <div><strong>Custom Presets</strong><small>4 with subscriptions, unlimited Lifetime</small></div>
+                <div><strong>Custom Presets</strong><small>Unlimited with Pro</small></div>
               </article>
+            <article class="proFeature"><span class="proFeatureIcon" aria-hidden="true">L/R</span><div><strong>Stereo Tools</strong><small>Balance, channel swap and stereo width</small></div></article>
             </div>
 
-            <p class="proMoreFeatures">Every plan unlocks all Pro tools. Lifetime also includes unlimited presets and 1500% volume boost.</p>
+            <p class="proMoreFeatures">One payment unlocks every Pro tool, unlimited presets and volume up to 1500%.</p>
 
             <div class="proPricing" aria-label="Pro pricing">
-              <div><strong>$1.49</strong><small>Monthly</small></div>
-              <div class="featuredPrice"><span>Best value</span><strong>$9.99</strong><small>Yearly</small></div>
-              <div><strong>$19.99</strong><small>Lifetime</small></div>
+              <div class="featuredPrice"><strong>$12.49</strong><small>One-time payment · Lifetime Pro</small></div>
             </div>
             </div>
 
@@ -177,6 +176,18 @@
                 </div>
                 <span class="proLiveBadge">Active</span>
               </div>
+
+              <section id="stereoToolsSection" class="proToolSection" data-pro-tool="stereo">
+                <div class="proToolHeader">
+                  <span class="proFeatureIcon" aria-hidden="true">L/R</span>
+                  <div><strong>Stereo Tools</strong><small>Balance channels and shape the stereo image.</small></div>
+                  <label class="miniSwitch" aria-label="Enable Stereo Tools"><input id="stereoToggle" type="checkbox"><span></span></label>
+                </div>
+                <label class="proStrengthControl" for="stereoBalance"><span>Left / right balance</span><output id="stereoBalanceValue">Center</output><input id="stereoBalance" type="range" min="-100" max="100" value="0"></label>
+                <label class="proStrengthControl" for="stereoWidth"><span>Stereo width</span><output id="stereoWidthValue">100%</output><input id="stereoWidth" type="range" min="0" max="200" value="100"></label>
+                <p class="stereoHint">0% mono · 100% original · 200% wide</p>
+                <div class="stereoActions"><label><input id="stereoSwap" type="checkbox"> Swap left and right</label><button id="resetStereoButton" type="button">Reset</button></div>
+              </section>
 
               <section class="proToolSection mixerSection">
                 <div class="proToolHeader mixerHeader">
@@ -397,7 +408,8 @@
         </section>
       </div>
 
-      <script src="popup.js"></script>
+      <script src="stereo.js"></script>
+    <script src="popup.js"></script>
     </div>
   </body>
 </html>

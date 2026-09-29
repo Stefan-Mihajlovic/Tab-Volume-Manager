@@ -7,7 +7,7 @@
   </picture>
 </h1>
 
-Tab Volume Manager is a browser audio workspace for controlling and enhancing the sound of every tab. Version 1.3 combines per-site volume control with quick effects, a visual equalizer, saved presets, and an optional Pro audio suite.
+Tab Volume Manager is a browser audio workspace for controlling and enhancing the sound of every tab. Version 1.4 combines per-site volume control with quick effects, a visual equalizer, saved presets, and an optional Pro audio suite.
 
 ## Free
 
@@ -28,13 +28,17 @@ Tab Volume Manager is a browser audio workspace for controlling and enhancing th
 - Full 10-band equalizer
 - Multi-tab Mixer for every audible tab
 - Sleep Timer with a gentle fade-out
-- Four custom presets with Monthly or Yearly
-- Unlimited presets and volume boost up to 1500% with Lifetime
+- Stereo Tools: left/right balance, channel swap, and stereo width (mono to wide)
+- Unlimited presets and volume boost up to 1500%
 
-Pro is available for $1.49 monthly, $9.99 yearly, or $19.99 lifetime. Every plan unlocks the complete Pro audio suite; Lifetime also includes unlimited presets and the extended volume range.
+Pro costs $12.49 as a one-time payment for a lifetime license, including the complete Pro audio suite, unlimited presets, and the extended volume range. Existing licenses remain supported.
 
 Settings and presets stay in local extension storage. Tab audio is captured and processed only while Tab Volume Manager is active, and Pro licenses are verified through the licensing service.
 
 ## License
 
 Copyright (c) 2025-2026 Stefan Mihajlovic. Tab Volume Manager is proprietary software and all rights are reserved. No permission is granted to use, copy, modify, or distribute its source code. See the [LICENSE](./LICENSE) file for the full terms.
+
+## Verification
+
+Run `node --test tests/stereo.test.js` for stereo bounds, headroom, and Pro entitlement gating. Serve the project locally and open `tests/stereo.html` to render and verify 11 stereo and mono cases with the browser’s OfflineAudioContext.

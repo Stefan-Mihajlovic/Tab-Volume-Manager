@@ -104,7 +104,7 @@ function normalizeEqBands(bands) {
 async function sanitizeSettings(settings = {}) {
   const proActive = await verifyStoredEntitlement();
   const eqBands = normalizeEqBands(settings.eqBands);
-  const maxVolume = proActive && entitlementCache.plan === "lifetime" ? 1500 : 500;
+  const maxVolume = proActive ? 1500 : 500;
   return {
     ...settings,
     volume: Math.max(0, Math.min(maxVolume, Number(settings.volume) || 0)),

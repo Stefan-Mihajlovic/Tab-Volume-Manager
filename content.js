@@ -49,6 +49,7 @@
     const adaptiveCompressor = ctx.createDynamicsCompressor();
     const adaptiveGain = ctx.createGain();
     const limiter = ctx.createDynamicsCompressor();
+    const stereo = TvmStereo.create(ctx);
 
     effectBass.type = "lowshelf";
     effectBass.frequency.value = 180;
@@ -83,12 +84,13 @@
     dialogueCompressor.connect(adaptiveCompressor);
     adaptiveCompressor.connect(adaptiveGain);
     adaptiveGain.connect(gain);
-    gain.connect(limiter);
+    gain.connect(stereo.input);
+    stereo.output.connect(limiter);
     limiter.connect(ctx.destination);
 
     return {
       gain, effectBass, effectVoice, eqFilters, dialogueHighpass, dialogueWarmth,
-      dialoguePresence, dialogueCompressor, adaptiveCompressor, adaptiveGain, limiter,
+      dialoguePresence, dialogueCompressor, adaptiveCompressor, adaptiveGain, limiter, stereo,
     };
   }
 
@@ -143,6 +145,7 @@
       });
 
       const now = ctx.currentTime;
+      TvmStereo.apply(nodes.stereo, manager.pro?.stereo, now);
       const dialogue = readProTool("movieDialogue");
       const dialogueAmount = dialogue.enabled ? dialogue.strength / 100 : 0;
       nodes.dialogueHighpass.frequency.setTargetAtTime(20 + dialogueAmount * 75, now, 0.03);

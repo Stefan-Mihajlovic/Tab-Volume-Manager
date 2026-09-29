@@ -51,7 +51,7 @@ function readProTool(settings, name) {
 function applySettings(session, settings = {}) {
   const proIsCurrent = Number(settings.proValidUntil) > Date.now() / 1000;
   const effectiveSettings = proIsCurrent ? settings : { ...settings, pro: null };
-  const maxVolume = proIsCurrent && settings.proPlan === "lifetime" ? 1500 : 500;
+  const maxVolume = proIsCurrent ? 1500 : 500;
   const volume = Math.max(0, Math.min(maxVolume, Number(settings.volume) || 0));
   const amount = Math.max(0, Math.min(20, Number(settings.effectAmount) || 0));
   const mode = ["bass", "voice"].includes(settings.effectMode)
@@ -64,6 +64,7 @@ function applySettings(session, settings = {}) {
   const adaptive = readProTool(effectiveSettings, "adaptiveVolume");
   const dialogue = readProTool(effectiveSettings, "movieDialogue");
   session.lastSettings = effectiveSettings;
+  TvmStereo.apply(session.stereo, effectiveSettings.pro?.stereo, now);
 
   session.gain.gain.setTargetAtTime(volume / 100, now, 0.015);
   session.effectBass.gain.setTargetAtTime(
@@ -135,6 +136,7 @@ async function createSession(tabId, streamId, settings) {
   const adaptiveGain = context.createGain();
   const gain = context.createGain();
   const limiter = context.createDynamicsCompressor();
+  const stereo = TvmStereo.create(context);
 
   effectBass.type = "lowshelf";
   effectBass.frequency.value = 180;
@@ -171,7 +173,8 @@ async function createSession(tabId, streamId, settings) {
   dialogueCompressor.connect(adaptiveCompressor);
   adaptiveCompressor.connect(adaptiveGain);
   adaptiveGain.connect(gain);
-  gain.connect(limiter);
+  gain.connect(stereo.input);
+  stereo.output.connect(limiter);
   limiter.connect(context.destination);
   await context.resume();
 
@@ -195,6 +198,7 @@ async function createSession(tabId, streamId, settings) {
     adaptiveGain,
     gain,
     limiter,
+    stereo,
     visualBandDb: EQ_FREQUENCIES.map(() => 0),
     meterTimer: null,
     lastSettings: null,
