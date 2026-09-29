@@ -713,20 +713,6 @@ button.selected:hover {
   background: rgba(74, 107, 255, 0.2);
 }
 
-.eqLevelMeter {
-  position: absolute;
-  z-index: 1;
-  bottom: 0;
-  left: 7px;
-  width: 6px;
-  height: var(--level, 0%);
-  max-height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(0deg, var(--accentDarker), #7890ff 72%, #dce4ff);
-  box-shadow: 0 0 10px rgba(90, 119, 255, 0.65);
-  transition: height 55ms linear;
-}
-
 .eqSliderRail > input.eqSlider {
   position: absolute;
   top: 74px;

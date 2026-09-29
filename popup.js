@@ -14,7 +14,7 @@ const volumeBlock = document.querySelector(".volumeBlock");
 const volumeDangerWarning = document.getElementById("volumeDangerWarning");
 const effectIntensityPC = document.querySelector("#effectIntensityPC input");
 const eqSliders = Array.from(document.querySelectorAll(".eqSlider"));
-const eqLevelMeters = Array.from(document.querySelectorAll(".eqLevelMeter"));
+const eqSliderRails = eqSliders.map((eqSlider) => eqSlider.closest(".eqSliderRail"));
 const eqSpectrum = document.getElementById("eqSpectrum");
 const eqSpectrumArea = eqSpectrum.querySelector(".eqSpectrumArea");
 const eqSpectrumLines = eqSpectrum.querySelectorAll(".eqSpectrumGlow, .eqSpectrumLine");
@@ -744,13 +744,11 @@ function updatePresetStatus() {
 
 function applyMeterLevels(message) {
   if (message?.type !== "ZAZ_EQ_LEVELS" || message.tabId !== activeTabId) return;
-  if (!Array.isArray(message.levels) || message.levels.length !== eqLevelMeters.length) return;
+  if (!Array.isArray(message.levels) || message.levels.length !== EQ_FREQUENCIES.length) return;
 
   lastMeterUpdateAt = Date.now();
-  eqLevelMeters.forEach((meter, index) => {
-    const level = Math.max(0, Math.min(100, Number(message.levels[index]) || 0));
-    spectrumTargets[index] = level;
-    meter.style.setProperty("--level", `${level}%`);
+  message.levels.forEach((level, index) => {
+    spectrumTargets[index] = Math.max(0, Math.min(100, Number(level) || 0));
   });
   startSpectrum();
 }
@@ -758,7 +756,7 @@ function applyMeterLevels(message) {
 function measureSpectrum() {
   const board = eqSpectrum.parentElement;
   const bounds = board.getBoundingClientRect();
-  const rails = eqLevelMeters.map((meter, index) => ({ index, bounds: meter.parentElement.getBoundingClientRect() }))
+  const rails = eqSliderRails.map((rail, index) => ({ index, bounds: rail.getBoundingClientRect() }))
     .filter((rail) => rail.bounds.height > 0);
   if (!rails.length || !board.clientWidth) {
     spectrumGeometry = null;
@@ -795,7 +793,6 @@ function renderSpectrum(time) {
     const blend = reducedMotion.matches ? 1 : 1 - Math.exp(-elapsed / (target > level ? 65 : 150));
     spectrumLevels[index] = Math.abs(target - level) < 0.05 ? target : level + (target - level) * blend;
     moving ||= spectrumLevels[index] > 0.05;
-    if (stale) eqLevelMeters[index].style.setProperty("--level", "0%");
   });
 
   const { width, height, bands } = spectrumGeometry;
