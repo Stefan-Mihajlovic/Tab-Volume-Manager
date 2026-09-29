@@ -1234,6 +1234,43 @@ button.presetSlot:not(:disabled):hover {
   font-weight: 800;
 }
 
+.iconSprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.proFeatureIcon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.proToolHeader .proFeatureIcon svg {
+  width: 23px;
+  height: 23px;
+}
+
+.proSparkGlyph {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+  vertical-align: -1px;
+}
+
+.proWelcomeSpark .proSparkGlyph {
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 0 9px rgba(232, 226, 255, 0.8));
+}
+
 .proFeature div {
   display: flex;
   flex-direction: column;
@@ -1249,17 +1286,6 @@ button.presetSlot:not(:disabled):hover {
   margin-top: 2px;
   font-size: 9.5px;
   line-height: 1.35;
-  color: var(--mutedText);
-}
-
-.proMoreFeatures {
-  padding: 9px 10px;
-  border: 1px dashed rgba(154, 132, 255, 0.22);
-  border-radius: 11px;
-  background: rgba(126, 96, 255, 0.05);
-  text-align: center;
-  font-size: 10px;
-  line-height: 1.5;
   color: var(--mutedText);
 }
 
@@ -1755,11 +1781,6 @@ button.presetSlot:not(:disabled):hover {
   font-size: 16px;
   font-weight: 400;
   line-height: 1;
-}
-
-.sleepTimerIcon {
-  font-size: 20px !important;
-  font-weight: 500 !important;
 }
 
 .sleepTimerBadge {

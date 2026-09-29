@@ -6,13 +6,27 @@
     <link rel="stylesheet" href="style.css">
   </head>
   <body class="licensePending">
+    <svg class="iconSprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <symbol id="tvm-icon-stereo" viewBox="0 0 24 24"><rect x="3" y="5" width="6" height="14" rx="2"/><rect x="15" y="5" width="6" height="14" rx="2"/><path d="M9 9h6m-2-2 2 2-2 2M15 15H9m2-2-2 2 2 2"/></symbol>
+        <symbol id="tvm-icon-boost" viewBox="0 0 24 24"><path d="M3 10h3l4-4v12l-4-4H3zM17 19V5m-4 4 4-4 4 4"/></symbol>
+        <symbol id="tvm-icon-limiter" viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 10-13h-8z"/></symbol>
+        <symbol id="tvm-icon-adaptive" viewBox="0 0 24 24"><path d="M3 4h18M3 20h18M3 12h2c2 0 2-5 4-5s2 10 4 10 2-5 4-5h4"/></symbol>
+        <symbol id="tvm-icon-dialogue" viewBox="0 0 24 24"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-8l-5 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z M8 9h8M8 13h5"/></symbol>
+        <symbol id="tvm-icon-eq" viewBox="0 0 24 24"><path d="M5 3v4m0 4v10M12 3v10m0 4v4M19 3v4m0 4v10"/><circle cx="5" cy="9" r="2"/><circle cx="12" cy="15" r="2"/><circle cx="19" cy="9" r="2"/></symbol>
+        <symbol id="tvm-icon-mixer" viewBox="0 0 24 24"><path d="M3 6h3m4 0h11M3 12h11m4 0h3M3 18h5m4 0h9"/><rect x="6" y="4" width="4" height="4" rx="1"/><rect x="14" y="10" width="4" height="4" rx="1"/><rect x="8" y="16" width="4" height="4" rx="1"/></symbol>
+        <symbol id="tvm-icon-presets" viewBox="0 0 24 24"><path d="M7 7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14l-7-4-7 4ZM3 17V3a2 2 0 0 1 2-2h10"/></symbol>
+        <symbol id="tvm-icon-sleep" viewBox="0 0 24 24"><path d="M20.5 14.3A9 9 0 0 1 9.7 3.5 9 9 0 1 0 20.5 14.3Z"/><path d="M17 3v4l3 2"/></symbol>
+        <symbol id="tvm-icon-spark" viewBox="0 0 24 24"><path d="m12 2 2.8 7.2L22 12l-7.2 2.8L12 22l-2.8-7.2L2 12l7.2-2.8Z"/></symbol>
+      </defs>
+    </svg>
     <div class="appWrapper">
       <header>
         <div class="headerBrand">
           <img src="icons/icon128.png" alt="Logo">
           <div class="headerTitleBlock">
             <h3>Tab Volume Manager</h3>
-            <span id="headerProBadge" class="headerProBadge hidden"><span aria-hidden="true">&#10022;</span> Pro</span>
+            <span id="headerProBadge" class="headerProBadge hidden"><svg class="proSparkGlyph" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-spark"/></svg> Pro</span>
           </div>
         </div>
         <label class="switch">
@@ -32,7 +46,7 @@
           Equalizer
         </button>
         <button id="proTab" class="tabButton proTabButton" type="button" role="tab" aria-selected="false" aria-controls="proPanel" data-tab="pro" tabindex="-1">
-          <span class="proTabSpark" aria-hidden="true">&#10022;</span><span class="proTabLabel">Pro</span>
+          <span class="proTabSpark" aria-hidden="true"><svg class="proSparkGlyph" viewBox="0 0 24 24"><use href="#tvm-icon-spark"/></svg></span><span class="proTabLabel">Pro</span>
         </button>
       </nav>
 
@@ -135,7 +149,7 @@
         <section id="proPanel" class="tabPanel hidden" role="tabpanel" aria-labelledby="proTab" data-panel="pro">
           <section class="controlCard proCard">
             <div class="proHero">
-              <span class="proComingBadge" id="proStatusBadge"><span aria-hidden="true">&#10022;</span> Pro access</span>
+              <span class="proComingBadge" id="proStatusBadge"><svg class="proSparkGlyph" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-spark"/></svg><span class="proStatusLabel">Pro access</span></span>
               <h2>More control. Better sound.</h2>
               <p>Advanced audio tools for movies, music, gaming and every tab you open.</p>
               <div class="proOrb" aria-hidden="true">
@@ -146,33 +160,38 @@
             <div id="proMarketingContent">
             <div class="proFeatureGrid">
               <article class="proFeature">
-                <span class="proFeatureIcon" aria-hidden="true">&#9889;</span>
+                <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-stereo"/></svg></span>
+                <div><strong>Stereo Tools</strong><small>Balance, channel swap and stereo width</small></div>
+              </article>
+              <article class="proFeature">
+                <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-boost"/></svg></span>
+                <div><strong>1500% Volume Boost</strong><small>Turn up any tab beyond its limits</small></div>
+              </article>
+              <article class="proFeature">
+                <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-limiter"/></svg></span>
                 <div><strong>Smart Limiter</strong><small>Boost without harsh clipping</small></div>
               </article>
               <article class="proFeature">
-                <span class="proFeatureIcon" aria-hidden="true">A</span>
+                <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-adaptive"/></svg></span>
                 <div><strong>Adaptive Volume</strong><small>Automatically balance loudness</small></div>
               </article>
               <article class="proFeature">
-                <span class="proFeatureIcon" aria-hidden="true">&#9654;</span>
+                <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-dialogue"/></svg></span>
                 <div><strong>Movie Dialogue</strong><small>Clear voices and controlled dynamics</small></div>
               </article>
               <article class="proFeature">
-                <span class="proFeatureIcon" aria-hidden="true">10</span>
+                <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-eq"/></svg></span>
                 <div><strong>10-band EQ</strong><small>More precise sound shaping</small></div>
               </article>
               <article class="proFeature">
-                <span class="proFeatureIcon" aria-hidden="true">&#9776;</span>
+                <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-mixer"/></svg></span>
                 <div><strong>Multi-tab Mixer</strong><small>Control every audible tab</small></div>
               </article>
               <article class="proFeature">
-                <span class="proFeatureIcon" aria-hidden="true">&#8734;</span>
+                <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-presets"/></svg></span>
                 <div><strong>Custom Presets</strong><small>Unlimited with Pro</small></div>
               </article>
-            <article class="proFeature"><span class="proFeatureIcon" aria-hidden="true">L/R</span><div><strong>Stereo Tools</strong><small>Balance, channel swap and stereo width</small></div></article>
             </div>
-
-            <p class="proMoreFeatures">One payment unlocks every Pro tool, unlimited presets and volume up to 1500%.</p>
 
             <div class="proPricing" aria-label="Pro pricing">
               <div class="featuredPrice"><strong>$12.49</strong><small>One-time payment · Lifetime Pro</small></div>
@@ -190,7 +209,7 @@
 
               <section id="stereoToolsSection" class="proToolSection" data-pro-tool="stereo">
                 <div class="proToolHeader">
-                  <span class="proFeatureIcon" aria-hidden="true">L/R</span>
+                  <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-stereo"/></svg></span>
                   <div><strong>Stereo Tools</strong><small>Balance channels and shape the stereo image.</small></div>
                   <label class="miniSwitch" aria-label="Enable Stereo Tools"><input id="stereoToggle" type="checkbox"><span></span></label>
                 </div>
@@ -208,7 +227,7 @@
 
               <section class="proToolSection mixerSection">
                 <div class="proToolHeader mixerHeader">
-                  <span class="proFeatureIcon" aria-hidden="true">&#9776;</span>
+                  <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-mixer"/></svg></span>
                   <div><strong>Multi-tab Mixer</strong><small>Control every currently audible tab in one place.</small></div>
                   <button id="refreshMixerButton" class="iconAction" type="button" aria-label="Refresh audible tabs">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z"/></svg>
@@ -219,7 +238,7 @@
 
               <section id="sleepTimerSection" class="proToolSection sleepTimerSection">
                 <div class="proToolHeader">
-                  <span class="proFeatureIcon sleepTimerIcon" aria-hidden="true">&#9790;</span>
+                  <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-sleep"/></svg></span>
                   <div><strong>Sleep Timer</strong><small>Gently fade out, mute and pause every audible tab.</small></div>
                   <span id="sleepTimerBadge" class="sleepTimerBadge hidden">Active</span>
                 </div>
@@ -240,7 +259,7 @@
 
               <section class="proToolSection" data-pro-tool="smartLimiter">
                 <div class="proToolHeader">
-                  <span class="proFeatureIcon" aria-hidden="true">&#9889;</span>
+                  <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-limiter"/></svg></span>
                   <div><strong>Smart Limiter</strong><small>Prevents harsh digital clipping at high volume.</small></div>
                   <label class="miniSwitch" aria-label="Enable Smart Limiter"><input id="smartLimiterToggle" type="checkbox"><span></span></label>
                 </div>
@@ -249,7 +268,7 @@
 
               <section class="proToolSection" data-pro-tool="adaptiveVolume">
                 <div class="proToolHeader">
-                  <span class="proFeatureIcon" aria-hidden="true">A</span>
+                  <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-adaptive"/></svg></span>
                   <div><strong>Adaptive Volume</strong><small>Balances quiet and loud moments automatically.</small></div>
                   <label class="miniSwitch" aria-label="Enable Adaptive Volume"><input id="adaptiveVolumeToggle" type="checkbox"><span></span></label>
                 </div>
@@ -258,7 +277,7 @@
 
               <section class="proToolSection" data-pro-tool="movieDialogue">
                 <div class="proToolHeader">
-                  <span class="proFeatureIcon" aria-hidden="true">&#9654;</span>
+                  <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-dialogue"/></svg></span>
                   <div><strong>Movie Dialogue</strong><small>Brings speech forward without making effects harsher.</small></div>
                   <label class="miniSwitch" aria-label="Enable Movie Dialogue"><input id="movieDialogueToggle" type="checkbox"><span></span></label>
                 </div>
@@ -311,7 +330,7 @@
           <div class="proWelcomeEmblem" aria-hidden="true">
             <span class="proWelcomeHalo"></span>
             <span class="proWelcomeRing"></span>
-            <span class="proWelcomeSpark">&#10022;</span>
+            <span class="proWelcomeSpark"><svg class="proSparkGlyph" viewBox="0 0 24 24"><use href="#tvm-icon-spark"/></svg></span>
           </div>
           <span id="proWelcomePlan" class="proWelcomePlan">Pro unlocked</span>
           <h2 id="proWelcomeTitle">Welcome to Pro</h2>

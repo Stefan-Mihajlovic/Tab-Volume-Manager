@@ -408,7 +408,7 @@ function setProUiActive(license, verifiedPlan, offline = false, expiresAt = 0) {
   proValidUntil = Number(expiresAt) || 0;
   proActivationState.classList.add("hidden");
   proActiveState.classList.remove("hidden");
-  proStatusBadge.textContent = "✦ Pro active";
+  proStatusBadge.querySelector(".proStatusLabel").textContent = "Pro active";
   const planName = proPlan
     ? `${proPlan.charAt(0).toUpperCase()}${proPlan.slice(1)}`
     : "Pro";
@@ -423,7 +423,7 @@ function setProUiInactive(message = "") {
   proValidUntil = 0;
   proActiveState.classList.add("hidden");
   proActivationState.classList.remove("hidden");
-  proStatusBadge.textContent = "✦ Pro access";
+  proStatusBadge.querySelector(".proStatusLabel").textContent = "Pro access";
   setProMessage(message);
   applyProAccessState(false);
 }
