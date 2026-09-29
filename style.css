@@ -710,7 +710,36 @@ button.selected:hover {
   inset: 0 auto 0 7px;
   width: 6px;
   border-radius: 999px;
-  background: rgba(74, 107, 255, 0.2);
+  background: rgba(74, 107, 255, 0.14);
+}
+
+.eqLevelMeter {
+  position: absolute;
+  z-index: 1;
+  bottom: 0;
+  left: 6px;
+  width: 8px;
+  height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 999px;
+  background: linear-gradient(0deg, #4658d5, #6482ff 65%, #bfd1ff);
+  box-shadow: 0 0 9px rgba(91, 122, 255, 0.28), inset 0 1px 0 rgba(235, 242, 255, 0.5);
+}
+
+.eqLevelMeter::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(226, 237, 255, 0.65);
+}
+
+.lightTheme .eqLevelMeter {
+  background: linear-gradient(0deg, #4c5eda, #6a80f4 65%, #9bafff);
+  box-shadow: 0 0 7px rgba(74, 107, 255, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .eqSliderRail > input.eqSlider {
@@ -2435,6 +2464,6 @@ button.presetSlot:not(:disabled):hover {
 .miniSwitch input:focus-visible + span { outline: 2px solid var(--accentColor); outline-offset: 3px; }
 .eqSpectrum { position: absolute; left: 0; width: 100%; height: 154px; pointer-events: none; overflow: hidden; }
 .eqSpectrumGlow, .eqSpectrumLine { fill: none; stroke: #829aff; stroke-linecap: round; stroke-linejoin: round; }
-.eqSpectrumGlow { stroke-width: 8px; opacity: .3; filter: blur(5px); }
-.eqSpectrumLine { stroke-width: 1.5px; opacity: .65; }
-.lightTheme .eqSpectrumLine { stroke: var(--accentColor); opacity: .5; }
+.eqSpectrumGlow { stroke-width: 3px; opacity: .06; filter: blur(3px); }
+.eqSpectrumLine { stroke-width: 1px; opacity: .2; }
+.lightTheme .eqSpectrumLine { stroke: var(--accentColor); opacity: .16; }

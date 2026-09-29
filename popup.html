@@ -121,8 +121,8 @@
               <svg id="eqSpectrum" class="eqSpectrum" aria-hidden="true" focusable="false" preserveAspectRatio="none">
                 <defs>
                   <linearGradient id="eqSpectrumFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#8199ff" stop-opacity="0.42" />
-                    <stop offset="100%" stop-color="#4a6bff" stop-opacity="0.03" />
+                    <stop offset="0%" stop-color="#8199ff" stop-opacity="0.05" />
+                    <stop offset="100%" stop-color="#4a6bff" stop-opacity="0" />
                   </linearGradient>
                 </defs>
                 <path class="eqSpectrumArea" fill="url(#eqSpectrumFill)" />
@@ -130,16 +130,16 @@
                 <path class="eqSpectrumLine" />
               </svg>
               <div class="eqGrid">
-                <label class="eqBand"><output id="eqValue0">0 dB</output><span class="eqSliderRail"><input type="range" class="eqSlider" data-band="0" min="-15" max="15" value="0" aria-label="Sub Bass, 32 Hz"></span><strong>32 Hz</strong><small>Sub Bass</small></label>
-                <label class="eqBand"><output id="eqValue1">0 dB</output><span class="eqSliderRail"><input type="range" class="eqSlider" data-band="1" min="-15" max="15" value="0" aria-label="Bass, 64 Hz"></span><strong>64 Hz</strong><small>Bass</small></label>
-                <label class="eqBand proOnlyEqBand"><output id="eqValue2">0 dB</output><span class="eqSliderRail"><input type="range" class="eqSlider" data-band="2" min="-15" max="15" value="0" aria-label="Bass detail, 125 Hz"></span><strong>125 Hz</strong><small>Body</small></label>
-                <label class="eqBand"><output id="eqValue3">0 dB</output><span class="eqSliderRail"><input type="range" class="eqSlider" data-band="3" min="-15" max="15" value="0" aria-label="Low Mid, 250 Hz"></span><strong>250 Hz</strong><small>Low Mid</small></label>
-                <label class="eqBand proOnlyEqBand"><output id="eqValue4">0 dB</output><span class="eqSliderRail"><input type="range" class="eqSlider" data-band="4" min="-15" max="15" value="0" aria-label="Midrange, 500 Hz"></span><strong>500 Hz</strong><small>Mid</small></label>
-                <label class="eqBand"><output id="eqValue5">0 dB</output><span class="eqSliderRail"><input type="range" class="eqSlider" data-band="5" min="-15" max="15" value="0" aria-label="Presence, 1 kHz"></span><strong>1 kHz</strong><small>Presence</small></label>
-                <label class="eqBand proOnlyEqBand"><output id="eqValue6">0 dB</output><span class="eqSliderRail"><input type="range" class="eqSlider" data-band="6" min="-15" max="15" value="0" aria-label="Vocal detail, 2 kHz"></span><strong>2 kHz</strong><small>Detail</small></label>
-                <label class="eqBand"><output id="eqValue7">0 dB</output><span class="eqSliderRail"><input type="range" class="eqSlider" data-band="7" min="-15" max="15" value="0" aria-label="Clarity, 4 kHz"></span><strong>4 kHz</strong><small>Clarity</small></label>
-                <label class="eqBand"><output id="eqValue8">0 dB</output><span class="eqSliderRail"><input type="range" class="eqSlider" data-band="8" min="-15" max="15" value="0" aria-label="Air, 8 kHz"></span><strong>8 kHz</strong><small>Air</small></label>
-                <label class="eqBand proOnlyEqBand"><output id="eqValue9">0 dB</output><span class="eqSliderRail"><input type="range" class="eqSlider" data-band="9" min="-15" max="15" value="0" aria-label="Brilliance, 16 kHz"></span><strong>16 kHz</strong><small>Brilliance</small></label>
+                <label class="eqBand"><output id="eqValue0">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="0" min="-15" max="15" value="0" aria-label="Sub Bass, 32 Hz"></span><strong>32 Hz</strong><small>Sub Bass</small></label>
+                <label class="eqBand"><output id="eqValue1">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="1" min="-15" max="15" value="0" aria-label="Bass, 64 Hz"></span><strong>64 Hz</strong><small>Bass</small></label>
+                <label class="eqBand proOnlyEqBand"><output id="eqValue2">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="2" min="-15" max="15" value="0" aria-label="Bass detail, 125 Hz"></span><strong>125 Hz</strong><small>Body</small></label>
+                <label class="eqBand"><output id="eqValue3">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="3" min="-15" max="15" value="0" aria-label="Low Mid, 250 Hz"></span><strong>250 Hz</strong><small>Low Mid</small></label>
+                <label class="eqBand proOnlyEqBand"><output id="eqValue4">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="4" min="-15" max="15" value="0" aria-label="Midrange, 500 Hz"></span><strong>500 Hz</strong><small>Mid</small></label>
+                <label class="eqBand"><output id="eqValue5">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="5" min="-15" max="15" value="0" aria-label="Presence, 1 kHz"></span><strong>1 kHz</strong><small>Presence</small></label>
+                <label class="eqBand proOnlyEqBand"><output id="eqValue6">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="6" min="-15" max="15" value="0" aria-label="Vocal detail, 2 kHz"></span><strong>2 kHz</strong><small>Detail</small></label>
+                <label class="eqBand"><output id="eqValue7">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="7" min="-15" max="15" value="0" aria-label="Clarity, 4 kHz"></span><strong>4 kHz</strong><small>Clarity</small></label>
+                <label class="eqBand"><output id="eqValue8">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="8" min="-15" max="15" value="0" aria-label="Air, 8 kHz"></span><strong>8 kHz</strong><small>Air</small></label>
+                <label class="eqBand proOnlyEqBand"><output id="eqValue9">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="9" min="-15" max="15" value="0" aria-label="Brilliance, 16 kHz"></span><strong>16 kHz</strong><small>Brilliance</small></label>
               </div>
             </div>
             <button id="resetEqualizer" class="secondaryAction">Reset EQ</button>

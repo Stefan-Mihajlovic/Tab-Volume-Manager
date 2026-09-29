@@ -14,7 +14,7 @@ const volumeBlock = document.querySelector(".volumeBlock");
 const volumeDangerWarning = document.getElementById("volumeDangerWarning");
 const effectIntensityPC = document.querySelector("#effectIntensityPC input");
 const eqSliders = Array.from(document.querySelectorAll(".eqSlider"));
-const eqSliderRails = eqSliders.map((eqSlider) => eqSlider.closest(".eqSliderRail"));
+const eqLevelMeters = Array.from(document.querySelectorAll(".eqLevelMeter"));
 const eqSpectrum = document.getElementById("eqSpectrum");
 const eqSpectrumArea = eqSpectrum.querySelector(".eqSpectrumArea");
 const eqSpectrumLines = eqSpectrum.querySelectorAll(".eqSpectrumGlow, .eqSpectrumLine");
@@ -125,11 +125,11 @@ let eqBands = [...EQ_DEFAULTS];
 let savedEqPresets = [];
 let loadedPresetName = null;
 let lastMeterUpdateAt = 0;
-let spectrumFrame = 0;
-let spectrumFrameTime = 0;
+let meterFrame = 0;
+let meterFrameTime = 0;
 let spectrumGeometry = null;
-const spectrumTargets = EQ_FREQUENCIES.map(() => 0);
-const spectrumLevels = EQ_FREQUENCIES.map(() => 0);
+const meterTargets = EQ_FREQUENCIES.map(() => 0);
+const meterLevels = EQ_FREQUENCIES.map(() => 0);
 let isProActive = false;
 let proPlan = null;
 let proValidUntil = 0;
@@ -696,10 +696,10 @@ function setActiveTab(tabName, save = true) {
 
   if (validTab === "equalizer") {
     measureSpectrum();
-    startSpectrum();
+    startMeters();
   } else {
-    cancelAnimationFrame(spectrumFrame);
-    spectrumFrame = 0;
+    cancelAnimationFrame(meterFrame);
+    meterFrame = 0;
   }
 
   if (save) chrome.storage.local.set({ [ACTIVE_TAB_KEY]: validTab });
@@ -748,15 +748,45 @@ function applyMeterLevels(message) {
 
   lastMeterUpdateAt = Date.now();
   message.levels.forEach((level, index) => {
-    spectrumTargets[index] = Math.max(0, Math.min(100, Number(level) || 0));
+    meterTargets[index] = Math.max(0, Math.min(100, Number(level) || 0));
   });
-  startSpectrum();
+  startMeters();
+}
+
+function startMeters() {
+  if (meterFrame || document.hidden || document.getElementById("equalizerPanel").classList.contains("hidden")) return;
+  if (!spectrumGeometry) measureSpectrum();
+  meterFrameTime = performance.now();
+  meterFrame = requestAnimationFrame(renderMeters);
+}
+
+function renderMeters(time) {
+  meterFrame = 0;
+  if (document.hidden || document.getElementById("equalizerPanel").classList.contains("hidden")) return;
+  const stale = Date.now() - lastMeterUpdateAt > 500;
+  const elapsed = Math.min(64, time - meterFrameTime);
+  meterFrameTime = time;
+  let moving = false;
+  meterLevels.forEach((level, index) => {
+    const target = stale ? 0 : meterTargets[index];
+    const blend = reducedMotion.matches ? 1 : 1 - Math.exp(-elapsed / (target > level ? 65 : 150));
+    const nextLevel = level + (target - level) * blend;
+    meterLevels[index] = Math.abs(target - nextLevel) < 0.05 ? target : nextLevel;
+    moving ||= meterLevels[index] > 0.05;
+    eqLevelMeters[index].style.height = `${meterLevels[index]}%`;
+  });
+
+  drawSpectrum(moving);
+
+  if (moving || (!stale && meterTargets.some((level) => level > 0))) {
+    meterFrame = requestAnimationFrame(renderMeters);
+  }
 }
 
 function measureSpectrum() {
   const board = eqSpectrum.parentElement;
   const bounds = board.getBoundingClientRect();
-  const rails = eqSliderRails.map((rail, index) => ({ index, bounds: rail.getBoundingClientRect() }))
+  const rails = eqLevelMeters.map((meter, index) => ({ index, bounds: meter.parentElement.getBoundingClientRect() }))
     .filter((rail) => rail.bounds.height > 0);
   if (!rails.length || !board.clientWidth) {
     spectrumGeometry = null;
@@ -773,31 +803,10 @@ function measureSpectrum() {
   eqSpectrum.setAttribute("viewBox", `0 0 ${width} ${height}`);
 }
 
-function startSpectrum() {
-  if (spectrumFrame || document.hidden || document.getElementById("equalizerPanel").classList.contains("hidden")) return;
-  if (!spectrumGeometry) measureSpectrum();
+function drawSpectrum(moving) {
   if (!spectrumGeometry) return;
-  spectrumFrameTime = performance.now();
-  spectrumFrame = requestAnimationFrame(renderSpectrum);
-}
-
-function renderSpectrum(time) {
-  spectrumFrame = 0;
-  if (document.hidden || !spectrumGeometry) return;
-  const stale = Date.now() - lastMeterUpdateAt > 500;
-  const elapsed = Math.min(64, time - spectrumFrameTime);
-  spectrumFrameTime = time;
-  let moving = false;
-  spectrumLevels.forEach((level, index) => {
-    const target = stale ? 0 : spectrumTargets[index];
-    const blend = reducedMotion.matches ? 1 : 1 - Math.exp(-elapsed / (target > level ? 65 : 150));
-    spectrumLevels[index] = Math.abs(target - level) < 0.05 ? target : level + (target - level) * blend;
-    moving ||= spectrumLevels[index] > 0.05;
-  });
-
   const { width, height, bands } = spectrumGeometry;
-  const points = bands.map(({ index, x }) => ({ x, y: height * (1 - spectrumLevels[index] / 100) }));
-  // Horizontal tangents join band levels smoothly without overshooting their peaks.
+  const points = bands.map(({ index, x }) => ({ x, y: height * (1 - meterLevels[index] / 100) }));
   let curve = `M 0 ${points[0].y}`;
   let previous = { x: 0, y: points[0].y };
   for (const point of [...points, { x: width, y: points[points.length - 1].y }]) {
@@ -808,20 +817,17 @@ function renderSpectrum(time) {
   eqSpectrumArea.setAttribute("d", `${curve} L ${width} ${height} L 0 ${height} Z`);
   eqSpectrumLines.forEach((line) => line.setAttribute("d", curve));
   eqSpectrum.style.opacity = moving ? "1" : "0";
-  if (moving || (!stale && spectrumTargets.some((level) => level > 0))) {
-    spectrumFrame = requestAnimationFrame(renderSpectrum);
-  }
 }
 
 new ResizeObserver(() => {
   measureSpectrum();
-  startSpectrum();
+  startMeters();
 }).observe(eqSpectrum.parentElement.querySelector(".eqGrid"));
 
 document.addEventListener("visibilitychange", () => {
-  cancelAnimationFrame(spectrumFrame);
-  spectrumFrame = 0;
-  if (!document.hidden) startSpectrum();
+  cancelAnimationFrame(meterFrame);
+  meterFrame = 0;
+  if (!document.hidden) startMeters();
 });
 
 function clearLoadedPreset() {
