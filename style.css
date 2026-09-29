@@ -2420,5 +2420,5 @@ button.presetSlot:not(:disabled):hover {
 .stereoHint { margin: 8px 0 12px; color: var(--mutedText); font-size: 11px; }
 .stereoActions { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
 .stereoActions label { display: flex; align-items: center; gap: 7px; }
-.stereoActions button { padding: 6px 12px; border: 1px solid var(--borderColor); border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
+.stereoActions button { padding: 6px 12px; border: 1px solid var(--borderColor); border-radius: 8px; background: transparent; color: var(--textColor); cursor: pointer; }
 .stereoActions :disabled { opacity: .45; cursor: default; }
