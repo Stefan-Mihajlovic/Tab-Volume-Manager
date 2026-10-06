@@ -271,6 +271,14 @@
   }
 
   window.addEventListener("message", (e) => {
+    if (e.data?.type === "TVM_REVOKE_PRO") {
+      clearTimeout(manager.proExpiryTimer);
+      manager.pro = null;
+      manager.proValidUntil = 0;
+      manager.gain = Math.min(5, manager.gain);
+      manager.eqBands = manager.eqBands.map((band, index) => [0, 1, 3, 5, 7, 8].includes(index) ? band : 0);
+      applySettings();
+    }
     if (e.data?.type === "ZAZ_VOLUME_UPDATE") {
       manager.gain = e.data.volume / 100;
       manager.effectMode = e.data.effectMode;
@@ -281,11 +289,13 @@
       manager.proValidUntil = Number(e.data.proValidUntil) || 0;
       manager.pro = manager.proValidUntil > Date.now() / 1000 ? e.data.pro || null : null;
       clearTimeout(manager.proExpiryTimer);
-      if (manager.pro) {
+      if (manager.proValidUntil > Date.now() / 1000) {
         const expiryDelay = Math.max(0, Math.min(2147483647, manager.proValidUntil * 1000 - Date.now()));
         manager.proExpiryTimer = setTimeout(() => {
           manager.pro = null;
           manager.proValidUntil = 0;
+          manager.gain = Math.min(5, manager.gain);
+          manager.eqBands = manager.eqBands.map((band, index) => [0, 1, 3, 5, 7, 8].includes(index) ? band : 0);
           applySettings();
         }, expiryDelay);
       }

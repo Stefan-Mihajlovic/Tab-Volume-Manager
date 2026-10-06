@@ -7,7 +7,7 @@
   </picture>
 </h1>
 
-Tab Volume Manager is a browser audio workspace for controlling and enhancing the sound of every tab. Version 1.4 combines per-site volume control with quick effects, a visual equalizer, saved presets, and an optional Pro audio suite.
+Tab Volume Manager is a browser audio workspace for controlling and enhancing the sound of every tab. It combines per-site volume control, quick effects, a visual equalizer, saved presets, and an optional Pro audio suite. Version 1.5 adds a free 7-day Pro trial.
 
 ## Free
 
@@ -21,6 +21,8 @@ Tab Volume Manager is a browser audio workspace for controlling and enhancing th
 - Light and dark themes
 
 ## Pro
+
+Try every Pro tool free for 7 days, without a card or automatic charge. Cancel early at any time; your saved presets stay safe.
 
 - Smart Limiter for cleaner high-volume playback
 - Adaptive Volume for balanced loudness
@@ -41,4 +43,8 @@ Copyright (c) 2025-2026 Stefan Mihajlovic. Tab Volume Manager is proprietary sof
 
 ## Verification
 
-Run `node --test tests/stereo.test.js` for stereo bounds, headroom, and Pro entitlement gating. Serve the project locally and open `tests/stereo.html` to render and verify 11 stereo and mono cases with the browser’s OfflineAudioContext.
+Run `node --test tests/*.test.js` for stereo bounds, headroom, trial expiry/cancellation, and Pro entitlement gating. Serve the project locally and open `tests/stereo.html` to render and verify 11 stereo and mono cases with the browser’s OfflineAudioContext.
+
+## Packaging
+
+Run `python3 scripts/package-release.py` to create the store ZIP in `dist/`. The package includes runtime files only and always uses production licensing. Local trial configuration and generated archives are excluded from Git.

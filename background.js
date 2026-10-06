@@ -1,5 +1,20 @@
+
+// Unpacked development only. Store builds always use production signing keys.
+const trialDevelopmentConfig = (async () => {
+  try {
+    if (typeof fetch !== "function" || !chrome.runtime.getManifest ||
+        chrome.runtime.getManifest().update_url ||
+        ["hnpafnldgablhjgagcfhjjaaalliegef", "pkninbkmgnhgiahpgcifjebbkgmafhoo"].includes(chrome.runtime.id)) return null;
+    const response = await fetch(chrome.runtime.getURL ? chrome.runtime.getURL("trial.local.json") : "trial.local.json");
+    if (!response.ok) return null;
+    const config = await response.json();
+    return config.api === "http://127.0.0.1:8789" && config.publicKey?.kty === "EC" ? config : null;
+  } catch { return null; }
+})();
 const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 const TVM_INSTALLATION_ID_KEY = "tvmProInstallationId";
+const TVM_TRIAL_KEY = "tvmTrial";
+const TRIAL_EXPIRY_ALARM = "tvmTrialExpiry";
 const TVM_ENTITLEMENT_KEY = "tvmProEntitlement";
 const TVM_LICENSE_PUBLIC_JWK = {
   kty: "EC",
@@ -57,31 +72,25 @@ async function verifyStoredEntitlement() {
   let expiresAt = 0;
   let plan = null;
   try {
-    const stored = await storageGet([TVM_INSTALLATION_ID_KEY, TVM_ENTITLEMENT_KEY]);
+    const stored = await storageGet([TVM_INSTALLATION_ID_KEY, TVM_ENTITLEMENT_KEY, TVM_TRIAL_KEY]);
     const installationId = stored[TVM_INSTALLATION_ID_KEY];
-    const entitlement = stored[TVM_ENTITLEMENT_KEY];
-    const parts = entitlement?.token?.split(".") || [];
-    if (typeof installationId === "string" && parts.length === 3) {
+    for (const [entitlement, trial] of [[stored[TVM_ENTITLEMENT_KEY], false], [stored[TVM_TRIAL_KEY]?.entitlement, true]]) {
+      const parts = entitlement?.token?.split(".") || [];
+      if (typeof installationId !== "string" || parts.length !== 3) continue;
       const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[1])));
-      const now = Math.floor(Date.now() / 1000);
-      if (payload.exp > now && entitlement.expiresAt > now && PRO_PLANS.has(payload.plan) &&
+      const header = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[0])));
+      if (payload.product !== "tab_volume_manager_pro" || header.alg !== "ES256") continue;
+      if (trial ? payload.plan !== "trial" || header.typ !== "EXT-TRIAL" : !PRO_PLANS.has(payload.plan)) continue;
+      if (Number.isFinite(payload.exp) && Number.isFinite(entitlement.expiresAt) && payload.exp > nowSeconds && entitlement.expiresAt > nowSeconds &&
           payload.installation === await installationClaim(installationId)) {
-        const publicKey = await crypto.subtle.importKey(
-          "jwk",
-          TVM_LICENSE_PUBLIC_JWK,
-          { name: "ECDSA", namedCurve: "P-256" },
-          false,
-          ["verify"]
-        );
-        valid = await crypto.subtle.verify(
-          { name: "ECDSA", hash: "SHA-256" },
-          publicKey,
-          base64UrlToBytes(parts[2]),
-          new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
-        );
+        const publicKey = await crypto.subtle.importKey("jwk", (trial && (await trialDevelopmentConfig)?.publicKey) || TVM_LICENSE_PUBLIC_JWK,
+          { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+        valid = await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, publicKey,
+          base64UrlToBytes(parts[2]), new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
         if (valid) {
           expiresAt = Math.min(payload.exp, entitlement.expiresAt);
           plan = payload.plan;
+          break;
         }
       }
     }
@@ -119,9 +128,28 @@ async function sanitizeSettings(settings = {}) {
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
-  if (changes[TVM_ENTITLEMENT_KEY] || changes[TVM_INSTALLATION_ID_KEY]) {
+  if (changes[TVM_ENTITLEMENT_KEY] || changes[TVM_INSTALLATION_ID_KEY] || changes[TVM_TRIAL_KEY]) {
     entitlementCache = { checkedAt: 0, valid: false, expiresAt: 0, plan: null };
+    void syncTrialAlarm();
+    void refreshAudioAccess();
   }
+});
+
+async function syncTrialAlarm() {
+  if (await verifyStoredEntitlement() && entitlementCache.plan === "trial") {
+    await chrome.alarms.create(TRIAL_EXPIRY_ALARM, { when: entitlementCache.expiresAt * 1000 });
+  } else {
+    await chrome.alarms.clear(TRIAL_EXPIRY_ALARM);
+    if (!await verifyStoredEntitlement()) {
+      await chrome.alarms.clear(SLEEP_TIMER_ALARM);
+      await storageRemove(SLEEP_TIMER_KEY);
+    }
+  }
+}
+chrome.runtime.onStartup.addListener(() => { void syncTrialAlarm(); });
+chrome.runtime.onInstalled.addListener(() => { void syncTrialAlarm(); });
+chrome.alarms.onAlarm.addListener(alarm => {
+  if (alarm.name === TRIAL_EXPIRY_ALARM) void syncTrialAlarm();
 });
 
 chrome.runtime.onConnect.addListener((port) => {
@@ -274,7 +302,8 @@ async function executeSleepTimer(timerState) {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== SLEEP_TIMER_ALARM) return;
   storageGet(SLEEP_TIMER_KEY)
-    .then((stored) => {
+    .then(async (stored) => {
+      if (!await verifyStoredEntitlement()) { await storageRemove(SLEEP_TIMER_KEY); return null; }
       const timerState = stored[SLEEP_TIMER_KEY];
       if (!timerState) return null;
       return executeSleepTimer(timerState);
@@ -379,4 +408,21 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     target: "offscreen",
     tabId,
   }).catch(() => {});
+});
+
+// Revoke all running processing immediately, while preserving saved presets/settings.
+async function refreshAudioAccess() {
+  if (await verifyStoredEntitlement()) return;
+  await chrome.runtime.sendMessage({ target: "offscreen", type: "TVM_REVOKE_PRO" }).catch(() => {});
+  const tabs = await chrome.tabs.query({});
+  await Promise.allSettled(tabs.filter(tab => tab.id).map(tab => chrome.scripting.executeScript({
+    target: { tabId: tab.id }, world: "MAIN",
+    func: () => window.postMessage({ type: "TVM_REVOKE_PRO" }, "*")
+  })));
+}
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type !== "TVM_REFRESH_ACCESS") return false;
+  entitlementCache.checkedAt = 0;
+  refreshAudioAccess().then(() => sendResponse({ ok: true }), () => sendResponse({ ok: false }));
+  return true;
 });

@@ -1,3 +1,16 @@
+
+// Unpacked development only. Store builds always use production signing keys.
+const trialDevelopmentConfig = (async () => {
+  try {
+    if (typeof fetch !== "function" || !chrome.runtime.getManifest ||
+        chrome.runtime.getManifest().update_url ||
+        ["hnpafnldgablhjgagcfhjjaaalliegef", "pkninbkmgnhgiahpgcifjebbkgmafhoo"].includes(chrome.runtime.id)) return null;
+    const response = await fetch(chrome.runtime.getURL ? chrome.runtime.getURL("trial.local.json") : "trial.local.json");
+    if (!response.ok) return null;
+    const config = await response.json();
+    return config.api === "http://127.0.0.1:8789" && config.publicKey?.kty === "EC" ? config : null;
+  } catch { return null; }
+})();
 const themeToggle = document.getElementById("themeToggle");
 const slider = document.getElementById("volumeSlider");
 const effectSlider = document.getElementById("effectSlider");
@@ -99,6 +112,13 @@ const SAVED_EQ_PRESET_KEY = "savedEqPreset";
 const SAVED_EQ_PRESETS_KEY = "savedEqPresets";
 const PRO_AUDIO_SETTINGS_KEY = "tvmProAudioSettings";
 const PRO_MIXER_VOLUMES_KEY = "tvmProMixerVolumes";
+const trialCard = document.getElementById("trialCard");
+const startTrialButton = document.getElementById("startTrialButton");
+const cancelTrialButton = document.getElementById("cancelTrialButton");
+const trialUpgradeButton = document.getElementById("trialUpgradeButton");
+const TVM_TRIAL_KEY = "tvmTrial";
+let trialState = null;
+let trialBusy = false;
 const TVM_LICENSE_KEY = "tvmProLicenseKey";
 const TVM_INSTALLATION_ID_KEY = "tvmProInstallationId";
 const TVM_ENTITLEMENT_KEY = "tvmProEntitlement";
@@ -287,7 +307,7 @@ async function installationClaim(installationId) {
   return bytesToHex(new Uint8Array(digest));
 }
 
-async function verifyEntitlement(entitlement, installationId) {
+async function verifyEntitlement(entitlement, installationId, allowTrial = false) {
   if (!entitlement?.token || typeof entitlement.expiresAt !== "number") return null;
   const parts = entitlement.token.split(".");
   if (parts.length !== 3) return null;
@@ -296,13 +316,17 @@ async function verifyEntitlement(entitlement, installationId) {
     const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[1])));
     const expectedInstallation = await installationClaim(installationId);
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp <= now || entitlement.expiresAt <= now) return null;
+    if (!Number.isFinite(payload.exp) || !Number.isFinite(entitlement.expiresAt) || payload.exp <= now || entitlement.expiresAt <= now) return null;
     if (payload.installation !== expectedInstallation) return null;
-    if (!normalizeProPlan(payload.plan)) return null;
+    if (payload.product !== "tab_volume_manager_pro") return null;
+    if (allowTrial) {
+      const header = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[0])));
+      if (payload.plan !== "trial" || header.typ !== "EXT-TRIAL" || header.alg !== "ES256") return null;
+    } else if (!normalizeProPlan(payload.plan)) return null;
 
     const publicKey = await crypto.subtle.importKey(
       "jwk",
-      TVM_LICENSE_PUBLIC_JWK,
+      (allowTrial && (await trialDevelopmentConfig)?.publicKey) || TVM_LICENSE_PUBLIC_JWK,
       { name: "ECDSA", namedCurve: "P-256" },
       false,
       ["verify"]
@@ -320,8 +344,10 @@ async function verifyEntitlement(entitlement, installationId) {
 }
 
 async function postLicenseApi(path, body) {
-  const response = await fetch(`${TVM_API_URL}${path}`, {
+  const api = (path.startsWith("/v1/trial/") && (await trialDevelopmentConfig)?.api) || TVM_API_URL;
+  const response = await fetch(`${api}${path}`, {
     method: "POST",
+    signal: AbortSignal.timeout(8000),
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -361,7 +387,7 @@ function hideProWelcome() {
   window.setTimeout(() => {
     proWelcomeCelebration.classList.add("hidden");
     proWelcomeCelebration.classList.remove("isLeaving", "lifetimeWelcome");
-    (proPlan === "lifetime" ? transferProButton : manageProButton).focus();
+    (proPlan === "trial" ? trialUpgradeButton : proPlan === "lifetime" ? transferProButton : manageProButton).focus();
   }, 320);
 }
 
@@ -404,11 +430,12 @@ function applyProAccessState(active) {
 }
 
 function setProUiActive(license, verifiedPlan, offline = false, expiresAt = 0) {
+  trialCard.classList.add("hidden");
+  headerProBadge.textContent = "Pro";
   proPlan = normalizeProPlan(verifiedPlan);
   proValidUntil = Number(expiresAt) || 0;
   proActivationState.classList.add("hidden");
   proActiveState.classList.remove("hidden");
-  proStatusBadge.querySelector(".proStatusLabel").textContent = "Pro active";
   const planName = proPlan
     ? `${proPlan.charAt(0).toUpperCase()}${proPlan.slice(1)}`
     : "Pro";
@@ -423,13 +450,12 @@ function setProUiInactive(message = "") {
   proValidUntil = 0;
   proActiveState.classList.add("hidden");
   proActivationState.classList.remove("hidden");
-  proStatusBadge.querySelector(".proStatusLabel").textContent = "Pro access";
   setProMessage(message);
   applyProAccessState(false);
 }
 
 function setProButtonsDisabled(disabled) {
-  [activateProButton, getProButton, manageProButton, transferProButton]
+  [activateProButton, getProButton, manageProButton, transferProButton, startTrialButton]
     .forEach((button) => { button.disabled = disabled; });
 }
 
@@ -488,7 +514,7 @@ async function validateStoredProLicense() {
   if (typeof licenseKey !== "string") {
     setProUiInactive();
     document.body.classList.remove("licensePending");
-    return false;
+    return restoreTrial();
   }
 
   proLicenseKeyInput.value = licenseKey;
@@ -537,7 +563,7 @@ async function validateStoredProLicense() {
           ? "This installation needs to be activated again."
           : "Could not verify the saved license.";
       setProUiInactive(message);
-      return false;
+      return restoreTrial();
     }
   };
 
@@ -547,6 +573,124 @@ async function validateStoredProLicense() {
   }
   return validateRemotely();
 }
+
+function renderTrial() {
+  if (!trialState || (isProActive && proPlan !== "trial")) { trialCard.classList.add("hidden"); return; }
+  trialCard.classList.remove("hidden");
+  const active = proPlan === "trial" && isProActive;
+  const cancelled = trialState.status === "cancelled";
+  const expired = trialState.status === "expired" || cancelled;
+  const remaining = Math.max(0, (trialState.expiresAt || 0) * 1000 - Date.now());
+  const days = Math.ceil(remaining / 86400000);
+  document.getElementById("trialTitle").textContent = active ? "All yours. Try it out." : cancelled ? "Your trial is cancelled." : expired ? "Your trial has ended." : "Try every Pro tool.";
+  document.getElementById("trialBadge").textContent = active ? (days > 1 ? `${days} days left` : "Less than a day left") : expired ? "Free plan" : "7 days free";
+  document.getElementById("trialDescription").textContent = active
+    ? `Pro until ${new Date(trialState.expiresAt * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" })}. No automatic charge.`
+    : expired ? "Your presets are safe. Keep Pro to use them all." : "No card. No automatic charge.";
+  const progress = document.getElementById("trialProgress");
+  progress.classList.toggle("hidden", !active);
+  const percent = Math.max(0, Math.min(100, remaining / ((trialState.expiresAt - trialState.startedAt) * 1000) * 100)) || 0;
+  progress.setAttribute("aria-valuenow", String(Math.round(percent)));
+  progress.firstElementChild.style.width = `${percent}%`;
+  startTrialButton.classList.toggle("hidden", active || expired);
+  trialUpgradeButton.classList.toggle("hidden", !active && !expired);
+  document.getElementById("trialActions").classList.toggle("hidden", !active && !expired);
+  cancelTrialButton.classList.toggle("hidden", !active);
+  headerProBadge.textContent = active ? "Trial" : "Pro";
+}
+
+function applyTrial(result, payload) {
+  // A late trial response must never replace paid access.
+  if (isProActive && proPlan !== "trial") return;
+  trialState = result.trial;
+  if (payload) {
+    trialState = { ...trialState, status: "active", expiresAt: payload.exp, startedAt: payload.startedAt };
+    proPlan = "trial";
+    proValidUntil = Math.min(payload.exp, result.entitlement.expiresAt);
+    applyProAccessState(true);
+    // Purchasing / entering a paid key stays available during the trial.
+    proActiveState.classList.add("hidden");
+    proActivationState.classList.remove("hidden");
+    setProMessage();
+  } else {
+    setProUiInactive();
+  }
+  renderTrial();
+}
+
+async function restoreTrial() {
+  const installationId = await ensureInstallationId();
+  const stored = (await storageGet(TVM_TRIAL_KEY))[TVM_TRIAL_KEY];
+  const cached = await verifyEntitlement(stored?.entitlement, installationId, true);
+  if (cached) applyTrial(stored, cached);
+  else if (stored?.trial) applyTrial({ trial: { ...stored.trial, status: stored.trial.status === "cancelled" ? "cancelled" : "expired" } }, null);
+  try {
+    const result = await postLicenseApi("/v1/trial/status", { product: "tab_volume_manager_pro", installationId });
+    const payload = await verifyEntitlement(result.entitlement, installationId, true);
+    if (result.trial.status === "active" && !payload) throw new Error("Invalid trial verification.");
+    await storageSet({ [TVM_TRIAL_KEY]: result });
+    applyTrial(result, payload);
+    return Boolean(payload);
+  } catch {
+    // Offline access is limited by the signature's original expiry; never extend it.
+    return Boolean(cached);
+  }
+}
+
+async function cancelTrial() {
+  if (trialBusy || proPlan !== "trial") return;
+  trialBusy = true;
+  cancelTrialButton.disabled = true;
+  const message = document.getElementById("trialMessage");
+  message.textContent = "";
+  try {
+    const installationId = await ensureInstallationId();
+    const result = await postLicenseApi("/v1/trial/cancel", { product: "tab_volume_manager_pro", installationId });
+    if (result.trial?.status !== "cancelled" || result.entitlement) throw new Error("Could not cancel your trial. Please try again.");
+    await storageSet({ [TVM_TRIAL_KEY]: result });
+    applyTrial(result, null);
+    await chrome.runtime.sendMessage({ type: "TVM_REFRESH_ACCESS" });
+    trialUpgradeButton.focus();
+  } catch (error) {
+    message.textContent = error.message || "Could not cancel your trial. Please try again.";
+  } finally {
+    trialBusy = false;
+    cancelTrialButton.disabled = false;
+  }
+}
+
+async function startTrial() {
+  if (trialBusy || isProActive) return;
+  trialBusy = true;
+  startTrialButton.disabled = true;
+  startTrialButton.textContent = "Starting your trial…";
+  const message = document.getElementById("trialMessage");
+  message.textContent = "";
+  try {
+    const installationId = await ensureInstallationId();
+    const result = await postLicenseApi("/v1/trial/start", { product: "tab_volume_manager_pro", installationId });
+    const payload = await verifyEntitlement(result.entitlement, installationId, true);
+    if (result.trial.status === "active" && !payload) throw new Error("Could not verify your trial. Please try again.");
+    await storageSet({ [TVM_TRIAL_KEY]: result });
+    applyTrial(result, payload);
+    if (payload) { trialUpgradeButton.focus(); }
+  } catch (error) {
+    message.textContent = error.message || "Could not start your trial. Please try again.";
+  } finally {
+    trialBusy = false;
+    startTrialButton.disabled = false;
+    startTrialButton.innerHTML = 'Start my 7-day trial <svg class="trialActionIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>';
+  }
+}
+
+setInterval(() => {
+  if (proPlan !== "trial") return;
+  if (proValidUntil <= Date.now() / 1000) {
+    trialState.status = "expired";
+    setProUiInactive();
+  }
+  renderTrial();
+}, 1000);
 
 async function manageProBilling() {
   setProButtonsDisabled(true);
@@ -628,6 +772,9 @@ function setupProLicensing() {
   proLicenseKeyInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") activateProLicense();
   });
+  cancelTrialButton.addEventListener("click", cancelTrial);
+  startTrialButton.addEventListener("click", startTrial);
+  trialUpgradeButton.addEventListener("click", () => chrome.tabs.create({ url: TVM_PRO_URL }));
   activateProButton.addEventListener("click", activateProLicense);
   getProButton.addEventListener("click", () => chrome.tabs.create({ url: TVM_PRO_URL }));
   manageProButton.addEventListener("click", manageProBilling);
@@ -1818,3 +1965,25 @@ async function initializeExtension() {
 }
 
 initializeExtension();
+
+// Distribution IDs distinguish Chrome Store installs even when running in Edge.
+function reviewStore(extensionId, userAgent) {
+  const isEdge = extensionId === "pkninbkmgnhgiahpgcifjebbkgmafhoo" ||
+    (extensionId !== "hnpafnldgablhjgagcfhjjaaalliegef" && /Edg\//.test(userAgent));
+  return isEdge
+    ? { name: "Edge Add-ons", url: "https://microsoftedge.microsoft.com/addons/detail/pkninbkmgnhgiahpgcifjebbkgmafhoo" }
+    : { name: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/tab-volume-manager/hnpafnldgablhjgagcfhjjaaalliegef" };
+}
+const ratingStore = reviewStore(chrome.runtime.id, navigator.userAgent);
+const ratingLink = document.getElementById("rateExtension");
+ratingLink.textContent = `Rate the extension on ${ratingStore.name}`;
+ratingLink.href = ratingStore.url;
+
+const REVIEW_LINK_OPENED_KEY = "tvmReviewLinkOpened";
+storageGet(REVIEW_LINK_OPENED_KEY).then(stored => {
+  ratingLink.classList.toggle("hidden", Boolean(stored[REVIEW_LINK_OPENED_KEY]));
+});
+ratingLink.addEventListener("click", () => {
+  ratingLink.classList.add("hidden");
+  void storageSet({ [REVIEW_LINK_OPENED_KEY]: true });
+});

@@ -74,6 +74,7 @@
               <button id="resetVolume" class="secondaryAction" type="button">Reset volume to 100%</button>
             </div>
           </section>
+          <a id="rateExtension" class="rateExtension hidden" target="_blank" rel="noopener noreferrer"></a>
         </section>
 
         <section id="effectsPanel" class="tabPanel hidden" role="tabpanel" aria-labelledby="effectsTab" data-panel="effects">
@@ -149,13 +150,20 @@
         <section id="proPanel" class="tabPanel hidden" role="tabpanel" aria-labelledby="proTab" data-panel="pro">
           <section class="controlCard proCard">
             <div class="proHero">
-              <span class="proComingBadge" id="proStatusBadge"><svg class="proSparkGlyph" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-spark"/></svg><span class="proStatusLabel">Pro access</span></span>
-              <h2>More control. Better sound.</h2>
-              <p>Advanced audio tools for movies, music, gaming and every tab you open.</p>
-              <div class="proOrb" aria-hidden="true">
-                <span></span>
-              </div>
+              <h2 id="proStatusBadge"><span class="proStatusLabel">Tab Volume Manager <span class="proWord">Pro</span></span></h2>
             </div>
+
+            <section id="trialCard" class="trialCard hidden" aria-label="Pro trial">
+              <div class="trialHeading"><strong id="trialTitle">Try every Pro tool.</strong><span id="trialBadge">7 days free</span></div>
+              <p id="trialDescription">No card. No automatic charge.</p>
+              <div id="trialProgress" class="trialProgress hidden" role="progressbar" aria-label="Trial time remaining" aria-valuemin="0" aria-valuemax="100"><span></span></div>
+              <button id="startTrialButton" class="trialButton" type="button">Start my 7-day trial <svg class="trialActionIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+              <div id="trialActions" class="trialActions hidden">
+              <button id="trialUpgradeButton" class="trialUpgrade hidden" type="button">Keep Pro forever <svg class="trialActionIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+              <button id="cancelTrialButton" class="trialCancel hidden" type="button">Cancel trial</button>
+              </div>
+              <p id="trialMessage" class="trialMessage" role="status" aria-live="polite"></p>
+            </section>
 
             <div id="proMarketingContent">
             <div class="proFeatureGrid">

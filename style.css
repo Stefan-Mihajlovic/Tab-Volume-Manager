@@ -40,6 +40,7 @@
   --mutedText: #9ba6c4;
   --accentColor: #4a6bff;
   --accentDarker: #3450d4;
+  --proGradient: linear-gradient(135deg, #795cff, #4d63e9);
   --buttonColor: #20283a;
   --buttonDarker: #273146;
   --borderColor: rgba(155, 175, 255, 0.12);
@@ -220,7 +221,8 @@ header h3 {
   outline-offset: 2px;
 }
 
-.proTabButton {
+.tabButton.proTabButton {
+  font-weight: 500;
   color: #c9b8ff;
 }
 
@@ -241,7 +243,7 @@ header h3 {
 
 .proTabButton.selected,
 .proTabButton.selected:hover {
-  background: linear-gradient(135deg, #795cff, #4d63e9);
+  background: var(--proGradient);
 }
 
 .proTabButton.proTabActivated .proTabSpark {
@@ -1597,7 +1599,7 @@ button.presetSlot:not(:disabled):hover {
 
 .miniSwitch input:checked + span {
   border-color: rgba(128, 109, 255, 0.72);
-  background: linear-gradient(135deg, #795cff, #4d63e9);
+  background: var(--proGradient);
 }
 
 .miniSwitch input:checked + span::after {
@@ -1658,7 +1660,7 @@ button.presetSlot:not(:disabled):hover {
 
 .iconAction.refreshing {
   border-color: rgba(128, 109, 255, 0.72);
-  background: linear-gradient(135deg, #795cff, #4d63e9);
+  background: var(--proGradient);
   color: #ffffff;
 }
 
@@ -2066,7 +2068,6 @@ button.presetSlot:not(:disabled):hover {
 
 .lightTheme .proTabButton {
   color: #5034ad;
-  font-weight: 800;
 }
 
 .lightTheme .proTabButton.selected,
@@ -2077,7 +2078,7 @@ button.presetSlot:not(:disabled):hover {
 .lightTheme .proTabButton.selected .proTabLabel,
 .lightTheme .proTabButton.selected .proTabSpark {
   color: #ffffff !important;
-  text-shadow: 0 1px 4px rgba(37, 27, 104, 0.28);
+  text-shadow: none;
 }
 
 .lightTheme .proCard {
@@ -2126,7 +2127,7 @@ button.presetSlot:not(:disabled):hover {
 
 .lightTheme .iconAction.refreshing {
   border-color: rgba(128, 109, 255, 0.72);
-  background: linear-gradient(135deg, #795cff, #4d63e9);
+  background: var(--proGradient);
   color: #ffffff;
 }
 
@@ -2467,3 +2468,62 @@ button.presetSlot:not(:disabled):hover {
 .eqSpectrumGlow { stroke-width: 3px; opacity: .06; filter: blur(3px); }
 .eqSpectrumLine { stroke-width: 1px; opacity: .2; }
 .lightTheme .eqSpectrumLine { stroke: var(--accentColor); opacity: .16; }
+
+/* Trial shares the existing Pro colors and remains separate from purchased licenses. */
+.trialCard { margin: 0; padding: 18px; border: 1px solid var(--borderColor); border-radius: 18px; background: var(--panelSecondary); }
+.trialHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.trialHeading strong { font-size: 15px; letter-spacing: -.3px; color: var(--textColor); }
+.trialHeading > span { color: var(--accentColor); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.trialCard p { color: var(--mutedText); font-size: 11px; margin-top: 6px; line-height: 1.6; }
+.trialButton, .trialUpgrade { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 12px 14px; margin-top: 14px; border-radius: 11px; border: 0; font-size: 12px; font-weight: 600; cursor: pointer; }
+.trialButton { color: white; background: var(--accentColor); }
+.trialButton:hover { background: var(--accentDarker); }
+.trialButton:disabled { opacity: .6; cursor: wait; }
+.trialUpgrade { background: var(--buttonColor); color: var(--textColor); }
+.trialButton:focus-visible, .trialUpgrade:focus-visible { outline: 2px solid var(--accentColor); outline-offset: 3px; }
+.trialCard .trialMessage:empty { display: none; }
+.trialProgress { height: 3px; background: var(--borderColor); border-radius: 3px; margin-top: 13px; overflow: hidden; }
+.trialProgress span { display: block; height: 100%; width: 100%; background: var(--accentColor); }
+
+.trialCard.hidden, .trialButton.hidden, .trialUpgrade.hidden, .trialProgress.hidden { display: none; }
+
+/* Compact Pro intro: title, trial, tools in one continuous stack. */
+.proCard .proHero { min-height: 0; padding: 0; margin: 0; }
+.proCard .proHero h2 { margin: 0; font-size: 16px; line-height: 1.4; letter-spacing: -.35px; text-align: center; }
+.proActive .proCard .proHero { display: block; }
+.proCard { gap: 12px; }
+
+.proWord {
+  display: inline-block;
+  padding-right: 3px;
+  margin-left: 2px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 23px;
+  line-height: 1;
+  letter-spacing: -.7px;
+  background: var(--proGradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #795cff;
+}
+.proTabLabel { font-weight: inherit; text-shadow: none; }
+
+/* Keep the selected Pro label as crisp as the other selected tabs. */
+.tabButton.proTabButton.selected, .tabButton.proTabButton.selected:hover { color: #fff; }
+.tabButton.proTabButton.selected .proTabLabel { color: #fff; -webkit-text-fill-color: #fff; }
+.rateExtension { display: block; margin: 14px 0 2px; text-align: center; color: var(--mutedText); font-size: 11px; text-decoration: none; }
+.rateExtension:hover { color: var(--textColor); text-decoration: underline; text-underline-offset: 3px; }
+.trialActions { display: flex; gap: 8px; margin-top: 14px; }
+.trialActions .trialUpgrade { flex: 1; width: auto; margin: 0; min-width: 0; padding: 12px; }
+.trialUpgrade, .trialCancel { border: 1px solid var(--borderColor); }
+.trialCancel { flex: 0 0 auto; padding: 12px 10px; border-radius: 11px; background: transparent; color: var(--mutedText); font-size: 11px; font-weight: 500; cursor: pointer; }
+.trialUpgrade:hover, .trialCancel:hover { background: var(--buttonHoverColor, var(--borderColor)); color: var(--textColor); }
+.trialActionIcon { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.trialCancel:disabled { opacity: .6; cursor: wait; }
+.trialCancel:focus-visible, .rateExtension:focus-visible { outline: 2px solid var(--accentColor); outline-offset: 3px; }
+.trialActions.hidden, .trialCancel.hidden { display: none; }
+
+.rateExtension.hidden { display: none; }

@@ -57,7 +57,8 @@ function applySettings(session, settings = {}) {
   const mode = ["bass", "voice"].includes(settings.effectMode)
     ? settings.effectMode
     : "none";
-  const bands = Array.isArray(settings.eqBands) ? settings.eqBands : [];
+  const bands = (Array.isArray(settings.eqBands) ? settings.eqBands : []).map((band, index) =>
+    proIsCurrent || [0, 1, 3, 5, 7, 8].includes(index) ? band : 0);
   const curve = effectCurve(mode, amount);
   const now = session.context.currentTime;
   const limiter = readProTool(effectiveSettings, "smartLimiter");
@@ -284,7 +285,7 @@ function startMeter(tabId, session) {
     if (sessions.get(tabId) !== session) return;
 
     try {
-      if (session.lastSettings?.pro && Number(session.lastSettings.proValidUntil) <= Date.now() / 1000) {
+      if (Number(session.lastSettings?.proValidUntil) > 0 && Number(session.lastSettings.proValidUntil) <= Date.now() / 1000) {
         applySettings(session, { ...session.lastSettings, pro: null, proValidUntil: 0 });
       }
       chrome.runtime.sendMessage(
@@ -349,6 +350,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.target !== "offscreen") return false;
 
   (async () => {
+    if (message.type === "TVM_REVOKE_PRO") {
+      for (const session of sessions.values()) applySettings(session, { ...session.lastSettings, pro: null, proValidUntil: 0 });
+      return { ok: true };
+    }
     if (message.type === "ZAZ_OFFSCREEN_STOP") {
       await stopSession(message.tabId);
       return { ok: true };

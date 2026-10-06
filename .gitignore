@@ -1,0 +1,15 @@
+
+# Local trial development only; never package this file.
+trial.local.json
+
+dist/
+
+.DS_Store
+node_modules/
+*.log
+__pycache__/
+*.pyc
+*.zip
+assets/store/*-review.jpg
+assets/store/*-submitted.jpg
+assets/store/submission*.json

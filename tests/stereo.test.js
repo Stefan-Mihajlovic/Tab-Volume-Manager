@@ -4,7 +4,8 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 
 function runtime() {
-  const context = vm.createContext({ chrome: { runtime: { onMessage: { addListener() {} } } } });
+  const handlers = [];
+  const context = vm.createContext({ handlers, chrome: { runtime: { onMessage: { addListener(fn) { handlers.push(fn); } } } } });
   vm.runInContext(fs.readFileSync(`${__dirname}/../stereo.js`, "utf8"), context);
   return context;
 }
@@ -39,14 +40,22 @@ test("Offscreen processing rejects stereo controls without a current Pro entitle
   const session = { context: { currentTime: 0 }, stereo: { matrix: Array.from({ length: 4 }, () => node()) }, filters: Array.from({ length: 10 }, node) };
   for (const key of ["gain", "effectBass", "effectVoice", "dialogueHighpass", "dialogueWarmth", "dialoguePresence", "dialogueCompressor", "adaptiveCompressor", "adaptiveGain", "limiter"]) session[key] = node();
   context.session = session;
-  context.settings = { volume: 1500, proValidUntil: 0, pro: { stereo: { enabled: true, swap: true } } };
+  context.settings = { volume: 1500, eqBands: Array(10).fill(6), proValidUntil: 0, pro: { stereo: { enabled: true, swap: true } } };
   vm.runInContext("applySettings(session, settings)", context);
   assert.deepEqual(session.stereo.matrix.map((n) => n.gain.value), [1, 0, 0, 1]);
   assert.equal(session.gain.gain.value, 5);
+  assert.equal(session.filters[2].gain.value, 0);
+  assert.equal(session.filters[0].gain.value, 6);
   context.settings.proValidUntil = Date.now() / 1000 + 60;
   vm.runInContext("applySettings(session, settings)", context);
   assert.deepEqual(session.stereo.matrix.map((n) => n.gain.value), [0, 1, 1, 0]);
   assert.equal(session.gain.gain.value, 15);
+  assert.equal(session.filters[2].gain.value, 6);
+  vm.runInContext("sessions.set(1, session)", context);
+  context.handlers[0]({ target: 'offscreen', type: 'TVM_REVOKE_PRO' }, {}, () => {});
+  assert.equal(session.gain.gain.value, 5);
+  assert.equal(session.filters[2].gain.value, 0);
+  assert.deepEqual(session.stereo.matrix.map((n) => n.gain.value), [1, 0, 0, 1]);
   context.settings.proValidUntil = Date.now() / 1000 - 1;
   vm.runInContext("applySettings(session, settings)", context);
   assert.deepEqual(session.stereo.matrix.map((n) => n.gain.value), [1, 0, 0, 1]);
@@ -75,10 +84,17 @@ test("Page audio contexts created after settings arrive restore stereo, and expi
   const context = vm.createContext({ window, AudioNode, document: { readyState: "loading", addEventListener() {} }, setTimeout(fn) { expiryHandler = fn; return 1; }, clearTimeout() {} });
   vm.runInContext(fs.readFileSync(`${__dirname}/../stereo.js`, "utf8"), context);
   vm.runInContext(fs.readFileSync(`${__dirname}/../content.js`, "utf8"), context);
-  messageHandler({ data: { type: "ZAZ_VOLUME_UPDATE", volume: 100, effectAmount: 0, proValidUntil: Date.now() / 1000 + 60, pro: { stereo: { enabled: true, swap: true } } } });
+  messageHandler({ data: { type: "ZAZ_VOLUME_UPDATE", volume: 1500, eqBands: Array(10).fill(6), effectAmount: 0, proValidUntil: Date.now() / 1000 + 60, pro: { stereo: { enabled: true, swap: true } } } });
   const audio = new window.AudioContext();
   const chain = window.__zazVolumeManager.nodes.get(audio);
   assert.deepEqual(Array.from(chain.stereo.matrix, (n) => n.gain.value), [0, 1, 1, 0]);
+  assert.equal(chain.gain.gain.value, 15);
+  messageHandler({ data: { type: "TVM_REVOKE_PRO" } });
+  assert.equal(chain.gain.gain.value, 5);
+  assert.equal(chain.eqFilters[2].gain.value, 0);
+  messageHandler({ data: { type: "ZAZ_VOLUME_UPDATE", volume: 1500, eqBands: Array(10).fill(6), effectAmount: 0, proValidUntil: Date.now() / 1000 + 60, pro: { stereo: { enabled: true, swap: true } } } });
   expiryHandler();
+  assert.equal(chain.gain.gain.value, 5);
+  assert.equal(chain.eqFilters[2].gain.value, 0);
   assert.deepEqual(Array.from(chain.stereo.matrix, (n) => n.gain.value), [1, 0, 0, 1]);
 });
