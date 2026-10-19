@@ -18,9 +18,17 @@
         <symbol id="tvm-icon-presets" viewBox="0 0 24 24"><path d="M7 7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14l-7-4-7 4ZM3 17V3a2 2 0 0 1 2-2h10"/></symbol>
         <symbol id="tvm-icon-sleep" viewBox="0 0 24 24"><path d="M20.5 14.3A9 9 0 0 1 9.7 3.5 9 9 0 1 0 20.5 14.3Z"/><path d="M17 3v4l3 2"/></symbol>
         <symbol id="tvm-icon-spark" viewBox="0 0 24 24"><path d="m12 2 2.8 7.2L22 12l-7.2 2.8L12 22l-2.8-7.2L2 12l7.2-2.8Z"/></symbol>
+        <symbol id="tvm-icon-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+        <symbol id="tvm-icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+        <symbol id="tvm-icon-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z"/><path d="M7 3v6h10V3M7 21v-8h10v8"/></symbol>
+        <symbol id="tvm-icon-folder" viewBox="0 0 24 24"><path d="M3 9V6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2M3 9h16a2 2 0 0 1 2 2l-2 8H5a2 2 0 0 1-2-2Z"/></symbol>
+        <symbol id="tvm-icon-reset" viewBox="0 0 24 24"><path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6"/></symbol>
+        <symbol id="tvm-icon-muted" viewBox="0 0 24 24"><path d="M11 4 6 8H3v8h3l5 4ZM16 9l5 6m0-6-5 6"/></symbol>
+        <symbol id="tvm-icon-volume" viewBox="0 0 24 24"><path d="M11 4 6 8H3v8h3l5 4ZM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></symbol>
       </defs>
     </svg>
     <div class="appWrapper">
+      <div class="appChrome">
       <header>
         <div class="headerBrand">
           <img src="icons/icon128.png" alt="Logo">
@@ -29,13 +37,20 @@
             <span id="headerProBadge" class="headerProBadge hidden"><svg class="proSparkGlyph" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-spark"/></svg> Pro</span>
           </div>
         </div>
-        <label class="switch">
-          <input type="checkbox" id="themeToggle">
-          <span class="slider"></span>
-        </label>
+        <div class="headerActions">
+          <label class="switch">
+            <input type="checkbox" id="themeToggle" aria-label="Light theme">
+            <span class="slider"></span>
+          </label>
+          <button id="powerToggle" class="powerButton" type="button" aria-label="Audio processing" aria-pressed="true" title="Turn off Tab Volume Manager" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v7M6.343 6.343a8 8 0 1 0 11.314 0"/></svg>
+          </button>
+        </div>
       </header>
+      <span id="powerStatus" class="powerStatus" role="status" aria-live="polite"></span>
 
-      <nav class="tabNavigation" role="tablist" aria-label="Audio controls">
+      <nav class="tabNavigation" role="tablist" aria-label="Audio controls" data-active="volume">
+        <span class="tabIndicator" aria-hidden="true"></span>
         <button id="volumeTab" class="tabButton selected" type="button" role="tab" aria-selected="true" aria-controls="volumePanel" data-tab="volume">
           Volume
         </button>
@@ -49,6 +64,7 @@
           <span class="proTabSpark" aria-hidden="true"><svg class="proSparkGlyph" viewBox="0 0 24 24"><use href="#tvm-icon-spark"/></svg></span><span class="proTabLabel">Pro</span>
         </button>
       </nav>
+      </div>
 
       <main class="tabContent">
         <section id="volumePanel" class="tabPanel" role="tabpanel" aria-labelledby="volumeTab" data-panel="volume">
@@ -70,25 +86,19 @@
               </div>
             </div>
             <div class="volumeActions">
-              <button id="muteVolume" class="secondaryAction muteVolumeButton" type="button" aria-pressed="false">Mute</button>
-              <button id="resetVolume" class="secondaryAction" type="button">Reset volume to 100%</button>
+              <button id="muteVolume" class="secondaryAction muteVolumeButton" type="button" aria-pressed="false"><svg class="actionIcon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-muted"/></svg><span>Mute</span></button>
+              <button id="resetVolume" class="secondaryAction" type="button"><svg class="actionIcon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-reset"/></svg><span>Reset volume to 100%</span></button>
             </div>
           </section>
           <a id="rateExtension" class="rateExtension hidden" target="_blank" rel="noopener noreferrer"></a>
         </section>
 
         <section id="effectsPanel" class="tabPanel hidden" role="tabpanel" aria-labelledby="effectsTab" data-panel="effects">
-          <section class="controlCard">
+          <section class="controlCard effectsCard">
             <div class="sectionHeading">
               <div>
                 <span class="sectionEyebrow">Quick effects</span>
                 <h3 class="sectionTitle">Sound profile</h3>
-              </div>
-              <div class="profileOrb" aria-hidden="true">
-                <span class="profileGlow"></span>
-                <span class="profileRing profileRingOne"></span>
-                <span class="profileRing profileRingTwo"></span>
-                <span class="profileCore"></span>
               </div>
             </div>
             <section class="effectsHolder">
@@ -113,8 +123,8 @@
                 <h3 class="sectionTitle">Equalizer</h3>
               </div>
               <div class="eqHeaderActions">
-                <button id="savePresetButton" class="compactAction" type="button">Save Preset</button>
-                <button id="loadPresetButton" class="compactAction primaryCompactAction" type="button">Load Preset</button>
+                <button id="savePresetButton" class="compactAction" type="button"><svg class="actionIcon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-save"/></svg><span>Save Preset</span></button>
+                <button id="loadPresetButton" class="compactAction primaryCompactAction" type="button"><svg class="actionIcon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-folder"/></svg><span>Load Preset</span></button>
               </div>
             </div>
 
@@ -143,7 +153,7 @@
                 <label class="eqBand proOnlyEqBand"><output id="eqValue9">0 dB</output><span class="eqSliderRail"><span class="eqLevelMeter" aria-hidden="true"></span><input type="range" class="eqSlider" data-band="9" min="-15" max="15" value="0" aria-label="Brilliance, 16 kHz"></span><strong>16 kHz</strong><small>Brilliance</small></label>
               </div>
             </div>
-            <button id="resetEqualizer" class="secondaryAction">Reset EQ</button>
+            <button id="resetEqualizer" class="secondaryAction"><svg class="actionIcon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-reset"/></svg><span>Reset EQ</span></button>
           </section>
         </section>
 
@@ -151,6 +161,7 @@
           <section class="controlCard proCard">
             <div class="proHero">
               <h2 id="proStatusBadge"><span class="proStatusLabel">Tab Volume Manager <span class="proWord">Pro</span></span></h2>
+              <span class="proLiveBadge">Active</span>
             </div>
 
             <section id="trialCard" class="trialCard hidden" aria-label="Pro trial">
@@ -193,7 +204,7 @@
               </article>
               <article class="proFeature">
                 <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-mixer"/></svg></span>
-                <div><strong>Multi-tab Mixer</strong><small>Control every audible tab</small></div>
+                <div><strong>Multi-tab Mixer</strong><small>Control every website tab</small></div>
               </article>
               <article class="proFeature">
                 <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-presets"/></svg></span>
@@ -202,19 +213,11 @@
             </div>
 
             <div class="proPricing" aria-label="Pro pricing">
-              <div class="featuredPrice"><strong>$12.49</strong><small>One-time payment · Lifetime Pro</small></div>
+              <div class="featuredPrice"><strong>$12.49</strong><small>One-time payment · Lifetime Pro</small><button id="getProButton" class="getProButton" type="button">Get Pro</button></div>
             </div>
             </div>
 
             <div id="proToolsContent" class="proToolsContent hidden">
-              <div class="proToolsHeading">
-                <div>
-                  <span class="sectionEyebrow">Pro audio suite</span>
-                  <h3 class="sectionTitle">Advanced controls</h3>
-                </div>
-                <span class="proLiveBadge">Active</span>
-              </div>
-
               <section id="stereoToolsSection" class="proToolSection" data-pro-tool="stereo">
                 <div class="proToolHeader">
                   <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-stereo"/></svg></span>
@@ -236,12 +239,12 @@
               <section class="proToolSection mixerSection">
                 <div class="proToolHeader mixerHeader">
                   <span class="proFeatureIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#tvm-icon-mixer"/></svg></span>
-                  <div><strong>Multi-tab Mixer</strong><small>Control every currently audible tab in one place.</small></div>
-                  <button id="refreshMixerButton" class="iconAction" type="button" aria-label="Refresh audible tabs">
+                  <div><strong>Multi-tab Mixer</strong><small>Adjust your tabs before or during playback.</small></div>
+                  <button id="refreshMixerButton" class="iconAction" type="button" aria-label="Refresh tabs">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z"/></svg>
                   </button>
                 </div>
-                <div id="mixerTabList" class="mixerTabList"><p class="mixerEmpty">Open another audible tab, then refresh.</p></div>
+                <div id="mixerTabList" class="mixerTabList"><p class="mixerEmpty">Open a website, then refresh.</p></div>
               </section>
 
               <section id="sleepTimerSection" class="proToolSection sleepTimerSection">
@@ -294,46 +297,46 @@
 
             </div>
 
-            <section class="proLicensePanel" aria-label="Pro license">
-              <div id="proActivationState">
-                <div class="proLicenseHeading">
-                  <div>
-                    <strong>Activate Pro</strong>
-                    <small>Already purchased? Enter your license key.</small>
-                  </div>
-                  <span class="proLicenseStatus">Free</span>
-                </div>
-                <label class="proLicenseField" for="proLicenseKeyInput">
-                  <span>License key</span>
-                  <input id="proLicenseKeyInput" type="text" autocomplete="off" spellcheck="false" placeholder="TVM-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX">
-                </label>
-                <div class="proLicenseActions">
-                  <button id="activateProButton" class="proPrimaryButton" type="button">Activate Pro</button>
-                  <button id="getProButton" type="button">Get Pro</button>
-                </div>
-              </div>
+          </section>
 
-              <div id="proActiveState" class="hidden">
-                <div class="proLicenseHeading">
-                  <div>
-                    <strong>Pro is active</strong>
-                    <small id="proLicenseSummary">Your license is connected to this installation.</small>
-                  </div>
-                  <span class="proLicenseStatus active">Active</span>
+          <section class="proLicensePanel" aria-label="Pro license">
+            <div id="proActivationState">
+              <div class="proLicenseHeading">
+                <div>
+                  <strong>Activate Pro</strong>
+                  <small>Already purchased? Enter your license key.</small>
                 </div>
-                <div class="proLicenseActions">
-                  <button id="manageProButton" class="proPrimaryButton" type="button">Manage billing</button>
-                  <button id="transferProButton" type="button">Transfer device</button>
-                </div>
+                <span class="proLicenseStatus">Free</span>
               </div>
+              <label class="proLicenseField" for="proLicenseKeyInput">
+                <span>License key</span>
+                <input id="proLicenseKeyInput" type="text" autocomplete="off" spellcheck="false" placeholder="TVM-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX">
+              </label>
+              <div class="proLicenseActions">
+                <button id="activateProButton" class="proPrimaryButton" type="button">Activate Pro</button>
+              </div>
+            </div>
 
-              <p id="proLicenseMessage" class="proLicenseMessage" role="status"></p>
-            </section>
+            <div id="proActiveState" class="hidden">
+              <div class="proLicenseHeading">
+                <div>
+                  <strong>Pro is active</strong>
+                  <small id="proLicenseSummary">Your license is connected to this installation.</small>
+                </div>
+                <span class="proLicenseStatus active">Active</span>
+              </div>
+              <div class="proLicenseActions">
+                <button id="manageProButton" class="proPrimaryButton" type="button">Manage billing</button>
+                <button id="transferProButton" type="button">Transfer device</button>
+              </div>
+            </div>
+
+            <p id="proLicenseMessage" class="proLicenseMessage" role="status"></p>
           </section>
         </section>
       </main>
 
-      <div id="proWelcomeCelebration" class="proWelcomeCelebration hidden" role="dialog" aria-modal="true" aria-labelledby="proWelcomeTitle">
+      <div id="proWelcomeCelebration" class="proWelcomeCelebration hidden" role="dialog" aria-modal="true" aria-labelledby="proWelcomeTitle" aria-describedby="proWelcomeDescription">
         <section class="proWelcomeContent">
           <div class="proWelcomeEmblem" aria-hidden="true">
             <span class="proWelcomeHalo"></span>
@@ -341,9 +344,9 @@
             <span class="proWelcomeSpark"><svg class="proSparkGlyph" viewBox="0 0 24 24"><use href="#tvm-icon-spark"/></svg></span>
           </div>
           <span id="proWelcomePlan" class="proWelcomePlan">Pro unlocked</span>
-          <h2 id="proWelcomeTitle">Welcome to Pro</h2>
+          <h2 id="proWelcomeTitle">Welcome to <span class="proWelcomeTitleAccent">Pro</span></h2>
           <p id="proWelcomeDescription">Advanced audio tools are ready.</p>
-          <button id="dismissProWelcome" class="proWelcomeButton" type="button">Start exploring</button>
+          <button id="dismissProWelcome" class="proWelcomeButton" type="button">Start exploring <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
         </section>
       </div>
 
@@ -364,7 +367,7 @@
           <p id="presetNameError" class="fieldError hidden">Enter a preset name.</p>
           <div class="modalActions">
             <button type="button" data-close-modal="savePresetModal">Cancel</button>
-            <button id="confirmSavePreset" class="modalPrimary" type="button">Save Preset</button>
+            <button id="confirmSavePreset" class="modalPrimary" type="button"><svg class="actionIcon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-save"/></svg><span>Save Preset</span></button>
           </div>
         </section>
       </div>
@@ -386,7 +389,6 @@
         <section class="modalPanel">
           <div class="modalHeader">
             <div>
-              <span class="sectionEyebrow">Move Pro access</span>
               <h3 id="transferLicenseTitle" class="modalTitle">Transfer to another device</h3>
             </div>
             <button class="modalClose" type="button" data-close-modal="transferLicenseModal" aria-label="Close transfer dialog">&times;</button>
@@ -394,7 +396,7 @@
           <p class="modalDescription">Copy this license key first. Confirming the transfer will deactivate Pro on this installation and free its activation slot.</p>
           <div class="transferLicenseKeyRow">
             <code id="transferLicenseKey">TVM-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX</code>
-            <button id="copyTransferLicenseButton" type="button">Copy</button>
+            <button id="copyTransferLicenseButton" type="button" aria-label="Copy license key" title="Copy license key"><svg class="actionIcon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-copy"/></svg></button>
           </div>
           <p id="transferLicenseMessage" class="fieldError hidden" role="status"></p>
           <div class="modalActions">
@@ -404,29 +406,36 @@
         </section>
       </div>
 
-      <div id="mixerSettingsModal" class="modalBackdrop hidden" role="dialog" aria-modal="true" aria-labelledby="mixerSettingsTitle">
+      <div id="mixerSettingsModal" class="modalBackdrop hidden" role="dialog" aria-modal="true" aria-labelledby="mixerModalName">
         <section class="modalPanel mixerSettingsPanel">
-          <div class="modalHeader">
-            <div>
-              <span class="sectionEyebrow">Mixer tab</span>
-              <h3 id="mixerSettingsTitle" class="modalTitle">Tab settings</h3>
+          <div class="modalHeader mixerModalHeader">
+            <div class="mixerModalIdentity">
+              <img id="mixerModalFavicon" src="icons/icon32.png" alt="">
+              <strong id="mixerModalName">Website tab</strong>
             </div>
             <button class="modalClose" type="button" data-close-modal="mixerSettingsModal" aria-label="Close tab settings dialog">&times;</button>
           </div>
-          <div class="mixerModalIdentity">
-            <img id="mixerModalFavicon" src="icons/icon32.png" alt="">
-            <div><strong id="mixerModalName">Audio tab</strong><small id="mixerModalTitle">Playing audio</small></div>
-          </div>
-          <label class="mixerModalVolume" for="mixerModalVolumeSlider">
-            <span>Volume</span>
-            <output id="mixerModalVolumeValue">100%</output>
-            <input id="mixerModalVolumeSlider" type="range" min="0" max="500" value="100">
-          </label>
+          <fieldset id="mixerSoundControls" class="mixerSoundControls" aria-label="Sound settings for this tab">
+            <div id="mixerQuickEffects" class="effectsHolder mixerQuickEffects" role="group" aria-label="Quick effects">
+              <button type="button" data-mode="none">Effects Off</button>
+              <button type="button" data-mode="bass">Bass Boost</button>
+              <button type="button" data-mode="voice">Voice Clarity</button>
+            </div>
+            <label class="mixerEffectIntensity" for="mixerEffectSlider">
+              <span>Effect intensity</span><output id="mixerEffectValue">50%</output>
+              <input id="mixerEffectSlider" type="range" min="0" max="20" step="1" value="10">
+            </label>
+            <div class="mixerEqHeading">
+              <div><strong>Equalizer</strong><span id="mixerEqCount">10 bands</span></div>
+              <div class="mixerPresetActions">
+                <button id="mixerSavePreset" class="compactAction" type="button" title="Save EQ preset" aria-label="Save EQ preset"><svg class="actionIcon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-save"/></svg><span>Save</span></button>
+                <button id="mixerLoadPreset" class="compactAction" type="button" title="Load EQ preset" aria-label="Load EQ preset"><svg class="actionIcon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-folder"/></svg><span>Load</span></button>
+              </div>
+            </div>
+            <div id="mixerEqGrid" class="mixerEqGrid"></div>
+            <button id="mixerResetEq" class="secondaryAction" type="button"><svg class="actionIcon" viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-reset"/></svg><span>Reset EQ</span></button>
+          </fieldset>
           <p id="mixerModalMessage" class="sleepTimerMessage hidden" role="status"></p>
-          <button id="applyCurrentSettingsButton" class="applyCurrentSettingsButton" type="button">
-            <span>Apply current settings</span>
-            <small>Copy volume, effects and EQ from the current tab</small>
-          </button>
         </section>
       </div>
 

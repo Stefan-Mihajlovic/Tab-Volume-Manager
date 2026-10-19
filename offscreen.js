@@ -5,6 +5,18 @@ const METER_INTERVAL_MS = 50;
 const METER_FLOOR_DB = -72;
 const METER_CEILING_DB = -14;
 const BASS_EFFECT_MULTIPLIER = 1.5;
+let powerEnabled = false;
+let powerRevision = 0;
+const powerReady = chrome.runtime.sendMessage({ type: "TVM_GET_POWER" }).then((stored) => {
+  if (powerRevision === 0) powerEnabled = stored.enabled !== false;
+});
+function routePower(session) {
+  if (session.routedPower === powerEnabled) return;
+  session.analyser.disconnect();
+  session.analyser.connect(powerEnabled ? session.effectBass : session.context.destination);
+  session.routedPower = powerEnabled;
+}
+
 
 function createFilter(context, index) {
   const filter = context.createBiquadFilter();
@@ -113,6 +125,7 @@ function applySettings(session, settings = {}) {
 }
 
 async function createSession(tabId, streamId, settings) {
+  await powerReady;
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: {
       mandatory: {
@@ -160,7 +173,7 @@ async function createSession(tabId, streamId, settings) {
   analyser.maxDecibels = -10;
 
   source.connect(analyser);
-  analyser.connect(effectBass);
+
   effectBass.connect(effectVoice);
   let current = effectVoice;
   filters.forEach((filter) => {
@@ -206,6 +219,7 @@ async function createSession(tabId, streamId, settings) {
   };
   sessions.set(tabId, session);
   applySettings(session, settings);
+  routePower(session);
   startMeter(tabId, session);
 
   stream.getAudioTracks()[0]?.addEventListener("ended", () => {
@@ -350,6 +364,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.target !== "offscreen") return false;
 
   (async () => {
+    if (message.type === "TVM_POWER") {
+      powerRevision++;
+      powerEnabled = message.enabled !== false;
+      sessions.forEach(routePower);
+      return { ok: true };
+    }
     if (message.type === "TVM_REVOKE_PRO") {
       for (const session of sessions.values()) applySettings(session, { ...session.lastSettings, pro: null, proValidUntil: 0 });
       return { ok: true };

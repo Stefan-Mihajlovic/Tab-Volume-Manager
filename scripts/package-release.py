@@ -5,8 +5,9 @@ root = Path(__file__).resolve().parents[1]
 version = json.loads((root / 'manifest.json').read_text())['version']
 output = root / 'dist' / f'tab-volume-manager-{version}.zip'
 output.parent.mkdir(exist_ok=True)
-files = ['manifest.json', 'popup.html', 'popup.js', 'style.css', 'background.js', 'content.js', 'stereo.js', 'offscreen.js', 'offscreen.html']
+files = ['manifest.json', 'popup.html', 'popup.js', 'style.css', 'background.js', 'content.js', 'power-bridge.js', 'stereo.js', 'offscreen.js', 'offscreen.html']
 files += [str(p.relative_to(root)) for p in (root / 'icons').glob('*.png')]
+files += ['assets/pro-header-glass.webp', 'assets/pro-welcome-glass.webp']
 with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as z:
     for name in files:
         data = (root / name).read_bytes()

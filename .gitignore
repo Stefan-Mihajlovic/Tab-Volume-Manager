@@ -13,3 +13,9 @@ __pycache__/
 assets/store/*-review.jpg
 assets/store/*-submitted.jpg
 assets/store/submission*.json
+
+# Local image-generation prompts and intermediate store artwork.
+*.prompt.txt
+assets/store/*/source/
+assets/store/*/artwork.html
+assets/store/*/preview.png

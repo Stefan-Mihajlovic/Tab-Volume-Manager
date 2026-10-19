@@ -12,6 +12,45 @@ const trialDevelopmentConfig = (async () => {
   } catch { return null; }
 })();
 const themeToggle = document.getElementById("themeToggle");
+const powerToggle = document.getElementById("powerToggle");
+const powerStatus = document.getElementById("powerStatus");
+let extensionEnabled = false;
+let powerRevision = 0;
+function syncPowerUI(enabled) {
+  extensionEnabled = enabled;
+  powerToggle.setAttribute("aria-pressed", String(enabled));
+  powerToggle.title = enabled ? "Turn off Tab Volume Manager" : "Turn on Tab Volume Manager";
+  powerStatus.textContent = enabled ? "Audio processing is on." : "Audio processing is off. Original audio is playing.";
+  document.body.classList.toggle("powerOff", !enabled);
+  document.querySelectorAll(".tabPanel, #mixerSettingsModal").forEach(panel => { panel.inert = !enabled; });
+}
+const powerReady = chrome.storage.local.get("tvmEnabled").then(stored => {
+  if (powerRevision === 0) syncPowerUI(stored.tvmEnabled !== false);
+  powerToggle.disabled = false;
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  if (changes.tvmEnabled) {
+    powerRevision++;
+    syncPowerUI(changes.tvmEnabled.newValue !== false);
+  }
+  if (changes.tvmSleepTimerState) void syncSleepTimerState();
+});
+powerToggle.addEventListener("click", async () => {
+  powerToggle.disabled = true;
+  const next = !extensionEnabled;
+  try {
+    await chrome.storage.local.set({ tvmEnabled: next });
+    syncPowerUI(next);
+    if (next) await updateAudio(slider.value);
+
+  } catch (error) {
+    powerStatus.textContent = "Could not change power. Please try again.";
+    powerToggle.title = powerStatus.textContent;
+  } finally {
+    powerToggle.disabled = false;
+  }
+});
 const slider = document.getElementById("volumeSlider");
 const effectSlider = document.getElementById("effectSlider");
 const bassBoostBtn = document.getElementById("bassBoost");
@@ -85,11 +124,12 @@ const mixerTabList = document.getElementById("mixerTabList");
 const mixerSettingsModal = document.getElementById("mixerSettingsModal");
 const mixerModalFavicon = document.getElementById("mixerModalFavicon");
 const mixerModalName = document.getElementById("mixerModalName");
-const mixerModalTitle = document.getElementById("mixerModalTitle");
-const mixerModalVolumeSlider = document.getElementById("mixerModalVolumeSlider");
-const mixerModalVolumeValue = document.getElementById("mixerModalVolumeValue");
+const mixerSoundControls = document.getElementById("mixerSoundControls");
+const mixerQuickEffects = document.getElementById("mixerQuickEffects");
+const mixerEffectSlider = document.getElementById("mixerEffectSlider");
+const mixerEffectValue = document.getElementById("mixerEffectValue");
+const mixerEqGrid = document.getElementById("mixerEqGrid");
 const mixerModalMessage = document.getElementById("mixerModalMessage");
-const applyCurrentSettingsButton = document.getElementById("applyCurrentSettingsButton");
 const sleepTimerSection = document.getElementById("sleepTimerSection");
 const sleepTimerBody = document.getElementById("sleepTimerBody");
 const sleepTimerOptions = document.getElementById("sleepTimerOptions");
@@ -163,6 +203,10 @@ let proAudioSettings = {
 let mixerVolumes = {};
 let selectedMixerTab = null;
 let selectedMixerRow = null;
+let presetMixerTarget = null;
+let mixerRefreshTimer = null;
+let mixerRefreshRevision = 0;
+const mixerRows = new Map();
 let sleepTimerEndsAt = 0;
 let sleepTimerInterval = null;
 let sleepTimerResizeTimer = null;
@@ -229,7 +273,8 @@ function syncMuteButton(value = slider.value) {
   const numericValue = Number(value) || 0;
   if (numericValue > 0) volumeBeforeMute = numericValue;
   const muted = numericValue === 0;
-  muteVolumeBtn.textContent = muted ? "Unmute" : "Mute";
+  muteVolumeBtn.querySelector("span").textContent = muted ? "Unmute" : "Mute";
+  muteVolumeBtn.querySelector("use").setAttribute("href", muted ? "#tvm-icon-volume" : "#tvm-icon-muted");
   muteVolumeBtn.setAttribute("aria-pressed", String(muted));
   muteVolumeBtn.classList.toggle("muted", muted);
 }
@@ -426,6 +471,7 @@ function applyProAccessState(active) {
     : "Save the current 10-band equalizer settings. Pro includes unlimited presets.";
 
   if (isProActive) refreshMixerTabs();
+  if (!mixerSettingsModal.classList.contains("hidden") && selectedMixerRow) openMixerSettings(selectedMixerRow._mixer.tab, selectedMixerRow);
   if (Number.isInteger(activeTabId)) updateAudio(slider.value);
 }
 
@@ -719,21 +765,30 @@ async function openLicenseTransfer() {
   transferLicenseKey.textContent = licenseKey;
   transferLicenseMessage.textContent = "";
   transferLicenseMessage.classList.add("hidden");
-  copyTransferLicenseButton.textContent = "Copy";
+  setTransferCopyState(false);
   openModal(transferLicenseModal);
+}
+
+function setTransferCopyState(copied, label = copied ? "License key copied" : "Copy license key") {
+  copyTransferLicenseButton.querySelector("use").setAttribute("href", copied ? "#tvm-icon-check" : "#tvm-icon-copy");
+  copyTransferLicenseButton.dataset.copied = String(copied);
+  copyTransferLicenseButton.setAttribute("aria-label", label);
+  copyTransferLicenseButton.title = label;
 }
 
 async function copyTransferLicense() {
   try {
     await navigator.clipboard.writeText(transferLicenseKey.textContent);
-    copyTransferLicenseButton.textContent = "Copied";
+    setTransferCopyState(true);
   } catch {
     const selection = window.getSelection();
     const range = document.createRange();
     range.selectNodeContents(transferLicenseKey);
     selection.removeAllRanges();
     selection.addRange(range);
-    copyTransferLicenseButton.textContent = "Selected";
+    setTransferCopyState(false, "License key selected; copy it manually");
+    transferLicenseMessage.textContent = "License key selected. Press Ctrl+C (Command+C on Mac) to copy.";
+    transferLicenseMessage.classList.remove("hidden");
   }
 }
 
@@ -825,10 +880,43 @@ function applyTheme(theme) {
   themeToggle.checked = isLight;
 }
 
+let tabIndicatorAnimation = null;
+
+function moveTabIndicator(navigation, index, animate) {
+  const indicator = navigation.querySelector(".tabIndicator");
+  // Read the visible position before cancelling so rapid clicks remain continuous.
+  const from = new DOMMatrixReadOnly(getComputedStyle(indicator).transform);
+  tabIndicatorAnimation?.cancel();
+  tabIndicatorAnimation = null;
+  navigation.style.setProperty("--tab-index", index);
+  if (!animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  const to = new DOMMatrixReadOnly(getComputedStyle(indicator).transform);
+  const distance = to.m41 - from.m41;
+  const stretch = Math.min(.16, Math.abs(distance) / indicator.offsetWidth * .1);
+  const frames = Array.from({ length: 41 }, (_, i) => {
+    const t = i / 40;
+    const spring = 1 - Math.exp(-9 * t) * (Math.cos(7 * t) + 9 / 7 * Math.sin(7 * t));
+    const pulse = Math.sin(Math.PI * Math.min(t / .7, 1)) ** 2;
+    const x = from.m41 + distance * spring;
+    const sx = 1 + (from.m11 - 1) * (1 - spring) + stretch * pulse;
+    const sy = 1 + (from.m22 - 1) * (1 - spring) - .035 * pulse;
+    return { offset: t, transform: `translateX(${x}px) scale(${sx}, ${sy})` };
+  });
+  frames[frames.length - 1].transform = `translateX(${to.m41}px) scale(1)`;
+  tabIndicatorAnimation = indicator.animate(frames, { duration: 540, easing: "linear" });
+}
+
 function setActiveTab(tabName, save = true) {
   const validTab = tabButtons.some((button) => button.dataset.tab === tabName)
     ? tabName
     : "volume";
+
+  const navigation = document.querySelector(".tabNavigation");
+  const tabChanged = navigation.dataset.active !== validTab;
+  if (save) navigation.classList.add("animateIndicator");
+  if (tabChanged || !save) moveTabIndicator(navigation, tabButtons.findIndex(button => button.dataset.tab === validTab), save && tabChanged);
+  navigation.dataset.active = validTab;
 
   tabButtons.forEach((button) => {
     const active = button.dataset.tab === validTab;
@@ -841,6 +929,8 @@ function setActiveTab(tabName, save = true) {
     panel.classList.toggle("hidden", panel.dataset.panel !== validTab);
   });
 
+  if (tabChanged) window.scrollTo({ top: 0, behavior: "instant" });
+
   if (validTab === "equalizer") {
     measureSpectrum();
     startMeters();
@@ -849,6 +939,7 @@ function setActiveTab(tabName, save = true) {
     meterFrame = 0;
   }
 
+  if (validTab === "pro" && isProActive) scheduleMixerRefresh();
   if (save) chrome.storage.local.set({ [ACTIVE_TAB_KEY]: validTab });
 }
 
@@ -983,7 +1074,16 @@ function clearLoadedPreset() {
 }
 
 function closeModal(modal) {
+  const wasOpen = !modal.classList.contains("hidden");
   modal.classList.add("hidden");
+  if (wasOpen && presetMixerTarget && [savePresetModal, loadPresetModal].includes(modal)) {
+    const row = presetMixerTarget;
+    presetMixerTarget = null;
+    if (row.isConnected) {
+      openMixerSettings(row._mixer.tab, row);
+      document.getElementById(modal === savePresetModal ? "mixerSavePreset" : "mixerLoadPreset").focus();
+    }
+  }
 }
 
 function openModal(modal) {
@@ -1007,12 +1107,19 @@ function createPresetSlot(preset, sourceIndex, displayIndex) {
     <span class="presetSlotAction">Load</span>`;
   loadButton.querySelector("strong").textContent = preset.name;
   loadButton.addEventListener("click", () => {
-    eqBands = normalizeEqBands(preset.eqBands);
-    loadedPresetName = preset.name;
-    syncEqualizerUI();
-    updatePresetStatus();
-    updateAudio(slider.value);
-    savePreset(slider.value, effectMode, effectAmount);
+    if (presetMixerTarget) {
+      const row = presetMixerTarget;
+      row._mixer.sound.eqBands = getEffectiveEqBands(preset.eqBands);
+      row._mixer.presetName = preset.name;
+      changeMixerVolume(row, row._mixer.value);
+    } else {
+      eqBands = normalizeEqBands(preset.eqBands);
+      loadedPresetName = preset.name;
+      syncEqualizerUI();
+      updatePresetStatus();
+      updateAudio(slider.value);
+      savePreset(slider.value, effectMode, effectAmount);
+    }
     closeModal(loadPresetModal);
   });
   row.appendChild(loadButton);
@@ -1079,22 +1186,24 @@ async function loadSavedPresets() {
   updateSavedPresetSlots();
 }
 
-function setupPresetControls() {
-  savePresetButton.addEventListener("click", () => {
-    presetNameInput.value = loadedPresetName || (!isProActive && savedEqPresets[0]?.name) || "";
+function openPresetDialog(modal, row = null) {
+  presetMixerTarget = row;
+  if (row) closeModal(mixerSettingsModal);
+  if (modal === savePresetModal) {
+    presetNameInput.value = (row ? row._mixer.presetName : loadedPresetName) || (!isProActive && savedEqPresets[0]?.name) || "";
+    savePresetDescription.textContent = row
+      ? "Save this tab’s equalizer settings to your presets."
+      : `Save the current ${isProActive ? "10" : "six"}-band equalizer settings.`;
     presetNameError.textContent = "Enter a preset name.";
     presetNameError.classList.add("hidden");
-    openModal(savePresetModal);
-    requestAnimationFrame(() => {
-      presetNameInput.focus();
-      presetNameInput.select();
-    });
-  });
+    requestAnimationFrame(() => { presetNameInput.focus(); presetNameInput.select(); });
+  } else updateSavedPresetSlots();
+  openModal(modal);
+}
 
-  loadPresetButton.addEventListener("click", () => {
-    updateSavedPresetSlots();
-    openModal(loadPresetModal);
-  });
+function setupPresetControls() {
+  savePresetButton.addEventListener("click", () => openPresetDialog(savePresetModal));
+  loadPresetButton.addEventListener("click", () => openPresetDialog(loadPresetModal));
 
   confirmSavePreset.addEventListener("click", async () => {
     const name = presetNameInput.value.trim();
@@ -1104,7 +1213,8 @@ function setupPresetControls() {
       return;
     }
 
-    const nextPreset = { name, eqBands: getEffectiveEqBands(), proOnly: false };
+    const targetRow = presetMixerTarget;
+    const nextPreset = { name, eqBands: getEffectiveEqBands(targetRow ? targetRow._mixer.sound.eqBands : eqBands), proOnly: false };
     if (isProActive) {
       const existingIndex = savedEqPresets.findIndex((preset) => preset.name.toLowerCase() === name.toLowerCase());
       if (existingIndex >= 0) {
@@ -1125,10 +1235,13 @@ function setupPresetControls() {
       if (freeIndex >= 0) savedEqPresets[freeIndex] = nextPreset;
       else savedEqPresets.unshift(nextPreset);
     }
-    loadedPresetName = name;
-    updatePresetStatus();
+    if (targetRow) targetRow._mixer.presetName = name;
+    else {
+      loadedPresetName = name;
+      updatePresetStatus();
+      savePreset(slider.value, effectMode, effectAmount);
+    }
     updateSavedPresetSlots();
-    savePreset(slider.value, effectMode, effectAmount);
     await storageSet({ [SAVED_EQ_PRESETS_KEY]: savedEqPresets });
     closeModal(savePresetModal);
   });
@@ -1155,6 +1268,10 @@ function setupPresetControls() {
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    if (presetMixerTarget) {
+      closeModal(!savePresetModal.classList.contains("hidden") ? savePresetModal : loadPresetModal);
+      return;
+    }
     closeModal(savePresetModal);
     closeModal(loadPresetModal);
     closeModal(transferLicenseModal);
@@ -1312,8 +1429,8 @@ function bindProTool(toggle, strengthInput, valueOutput, settingName) {
   });
 }
 
-async function sendSettingsToTab(tabId, settings) {
-  return chrome.runtime.sendMessage({ type: "ZAZ_CAPTURE_TAB", tabId, settings });
+async function sendSettingsToTab(tabId, settings, allowPageFallback = false) {
+  return chrome.runtime.sendMessage({ type: "ZAZ_CAPTURE_TAB", tabId, settings, allowPageFallback });
 }
 
 function tabDisplayName(tab) {
@@ -1328,11 +1445,11 @@ function tabDisplayName(tab) {
   }
 }
 
-async function applyMixerVolume(tab, volume) {
+async function applyMixerVolume(tab, volume, sound = mixerRows.get(tab.id)?._mixer.sound) {
   let hostname = null;
   try { hostname = new URL(tab.url).hostname; } catch (error) { /* restricted tab */ }
   const stored = hostname ? await storageGet(hostname) : {};
-  const siteSettings = hostname ? stored[hostname] || {} : {};
+  const siteSettings = { ...(hostname ? stored[hostname] || {} : {}), ...sound };
   const savedEffectAmount = Number(siteSettings.effectAmount);
   const settings = {
     volume,
@@ -1344,8 +1461,10 @@ async function applyMixerVolume(tab, volume) {
       : getEffectiveProSettings(),
     proValidUntil,
   };
-  const result = await sendSettingsToTab(tab.id, settings);
+  const result = await sendSettingsToTab(tab.id, settings, true);
   if (!result?.ok) throw new Error(result?.error || "This tab could not be connected.");
+  if (hostname) await storageSet({ [hostname]: { ...siteSettings, volume, ...(sound ? { eqPresetName: null } : {}) } });
+  return result;
 }
 
 function setMixerModalMessage(message = "", success = false) {
@@ -1354,141 +1473,308 @@ function setMixerModalMessage(message = "", success = false) {
   mixerModalMessage.classList.toggle("success", success);
 }
 
-function updateSelectedMixerVolume(value) {
-  const nextVolume = Math.max(0, Math.min(getMaxVolume(), Number(value) || 0));
-  mixerModalVolumeSlider.value = String(nextVolume);
-  mixerModalVolumeValue.textContent = `${nextVolume}%`;
-  selectedMixerRow?.querySelector(".mixerSettingsValue")?.replaceChildren(`${nextVolume}%`);
-  return nextVolume;
+function normalizeMixerSound(settings = {}) {
+  return {
+    effectMode: ["none", "bass", "voice"].includes(settings.effectMode) ? settings.effectMode : "none",
+    effectAmount: Math.max(0, Math.min(20, Number.isFinite(Number(settings.effectAmount)) ? Number(settings.effectAmount) : 10)),
+    eqBands: normalizeEqBands(settings.eqBands),
+  };
 }
 
-function openMixerSettings(tab, row, value) {
+function renderMixerSound() {
+  if (!selectedMixerRow?._mixer.sound) return;
+  const sound = selectedMixerRow._mixer.sound;
+  mixerQuickEffects.querySelectorAll("button").forEach(button => {
+    const selected = button.dataset.mode === sound.effectMode;
+    button.classList.toggle("selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+  mixerEffectSlider.value = String(sound.effectAmount);
+  mixerEffectSlider.disabled = sound.effectMode === "none";
+  mixerEffectValue.textContent = `${sound.effectAmount * 5}%`;
+  mixerEffectSlider.closest("label").classList.toggle("isInactive", sound.effectMode === "none");
+  mixerEqGrid.querySelectorAll("input").forEach(input => {
+    const value = sound.eqBands[Number(input.dataset.band)];
+    input.value = String(value);
+    input.setAttribute("aria-valuetext", `${value} decibels`);
+    input.closest("label").querySelector("output").textContent = `${value > 0 ? "+" : ""}${value}`;
+  });
+}
+
+function changeMixerSound(mutator) {
+  if (!selectedMixerRow || !extensionEnabled || !isProActive) return;
+  mutator(selectedMixerRow._mixer.sound);
+  renderMixerSound();
+  setMixerModalMessage();
+  changeMixerVolume(selectedMixerRow, selectedMixerRow._mixer.value);
+}
+
+function openMixerSettings(tab, row) {
   selectedMixerTab = tab;
   selectedMixerRow = row;
+  if (tab.id === activeTabId && !row._mixer.saving) {
+    row._mixer.sound = normalizeMixerSound({ effectMode, effectAmount, eqBands });
+    row._mixer.confirmedSound = structuredClone(row._mixer.sound);
+  }
   mixerModalFavicon.src = tab.favIconUrl || "icons/icon32.png";
-  mixerModalName.textContent = tabDisplayName(tab);
-  mixerModalTitle.textContent = tab.title || "Playing audio";
-  mixerModalVolumeSlider.max = String(getMaxVolume());
-  updateSelectedMixerVolume(value);
+  mixerModalName.textContent = tab.title || tabDisplayName(tab);
+  mixerModalName.title = mixerModalName.textContent;
+  mixerEqGrid.replaceChildren();
+  const indices = EQ_FREQUENCIES.map((_, i) => i).filter(i => isProActive || FREE_EQ_INDICES.has(i));
+  mixerEqGrid.style.setProperty("--mixer-bands", indices.length);
+  document.getElementById("mixerEqCount").textContent = `${indices.length} bands · dB`;
+  for (const index of indices) {
+    const band = document.createElement("label");
+    band.className = "eqBand";
+    const output = document.createElement("output");
+    const rail = document.createElement("span");
+    rail.className = "eqSliderRail";
+    const input = document.createElement("input");
+    input.type = "range"; input.className = "eqSlider mixerEqSlider";
+    input.min = "-15"; input.max = "15"; input.step = "1";
+    input.dataset.band = String(index);
+    input.setAttribute("aria-label", `${EQ_FREQUENCIES[index]} Hz gain`);
+    input.addEventListener("input", () => changeMixerSound(sound => { sound.eqBands[index] = Number(input.value); }));
+    const frequency = document.createElement("strong");
+    frequency.textContent = EQ_FREQUENCIES[index] >= 1000 ? `${EQ_FREQUENCIES[index] / 1000}k` : String(EQ_FREQUENCIES[index]);
+    frequency.title = `${EQ_FREQUENCIES[index]} Hz`;
+    rail.append(input); band.append(output, rail, frequency); mixerEqGrid.append(band);
+  }
+  mixerSoundControls.disabled = !extensionEnabled || !isProActive;
+  renderMixerSound();
   setMixerModalMessage();
   openModal(mixerSettingsModal);
-  requestAnimationFrame(() => mixerModalVolumeSlider.focus());
+  requestAnimationFrame(() => mixerQuickEffects.querySelector(".selected").focus());
 }
 
-async function applyCurrentSettingsToMixerTab() {
-  if (!selectedMixerTab?.id) return;
-  const settings = {
-    volume: Math.max(0, Math.min(getMaxVolume(), Number(slider.value) || 0)),
-    effectMode,
-    effectAmount,
-    eqBands: getEffectiveEqBands(),
-    pro: getEffectiveProSettings(),
-    proValidUntil,
-  };
+function mixerIconButton(icon, label, className) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `mixerIconButton ${className}`;
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  // Icon names are internal constants; tab names are assigned as text elsewhere.
+  button.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#tvm-icon-${icon}"/></svg>`;
+  return button;
+}
 
-  applyCurrentSettingsButton.disabled = true;
-  setMixerModalMessage("Applying current tab settings…");
+// Give everyday volume levels usable travel while retaining the full Pro boost range.
+function mixerSliderPosition(volume) {
+  return Math.round(Math.sqrt(volume / getMaxVolume()) * 1000);
+}
+
+function renderMixerRowVolume(row, value) {
+  const state = row._mixer;
+  state.value = value;
+  if (value > 0) state.beforeMute = value;
+  state.range.value = String(mixerSliderPosition(value));
+  state.range.setAttribute("aria-valuetext", `${value} percent`);
+  state.number.value = String(value);
+  state.range.style.setProperty("--mixer-fill", `${mixerSliderPosition(value) / 10}%`);
+  renderMixerRowStatus(row);
+}
+
+function renderMixerRowStatus(row) {
+  const state = row._mixer;
+  const muted = state.value === 0 || state.tab.mutedInfo?.muted;
+  state.mute.setAttribute("aria-pressed", String(muted));
+  state.mute.setAttribute("aria-label", `${muted ? "Unmute" : "Mute"} ${state.tab.title || tabDisplayName(state.tab)}`);
+  state.mute.title = muted ? "Unmute" : "Mute";
+  state.mute.querySelector("use").setAttribute("href", `#tvm-icon-${muted ? "muted" : "volume"}`);
+  row.classList.toggle("isMuted", muted);
+  state.status.textContent = muted ? "Muted" : state.deferred ? "Saved" : state.tab.audible ? "Playing" : "Quiet";
+  state.status.classList.toggle("isPlaying", !muted && !!state.tab.audible);
+}
+
+async function changeMixerVolume(row, value) {
+  if (!extensionEnabled || !isProActive) return;
+  const state = row._mixer;
+  state.pending = Math.max(0, Math.min(getMaxVolume(), Math.round(Number(value) || 0)));
+  renderMixerRowVolume(row, state.pending);
+  state.error.classList.add("hidden");
+  if (state.saving) return;
+  state.saving = true;
+  // Keep only the newest queued value while dragging; never race older writes.
   try {
-    const result = await sendSettingsToTab(selectedMixerTab.id, settings);
-    if (!result?.ok) throw new Error(result?.error || "This tab could not be connected.");
-
-    mixerVolumes[selectedMixerTab.id] = settings.volume;
-    const valuesToStore = { [PRO_MIXER_VOLUMES_KEY]: mixerVolumes };
-    try {
-      const hostname = new URL(selectedMixerTab.url).hostname;
-      valuesToStore[hostname] = {
-        volume: settings.volume,
-        effectMode: settings.effectMode,
-        effectAmount: settings.effectAmount,
-        eqBands: normalizeEqBands(settings.eqBands),
-        eqPresetName: loadedPresetName,
-        proAudio: normalizeProAudioSettings(proAudioSettings),
-      };
-    } catch (error) {
-      // Restricted pages can still receive captured audio settings.
+    while (state.pending !== null) {
+      const next = state.pending;
+      const sound = state.sound ? structuredClone(state.sound) : undefined;
+      state.pending = null;
+      try {
+        const result = await applyMixerVolume(state.tab, next, sound);
+        state.deferred = !!result?.pending;
+        if (next > 0 && state.tab.mutedInfo?.muted) {
+          await chrome.tabs.update(state.tab.id, { muted: false });
+          state.tab.mutedInfo = { ...state.tab.mutedInfo, muted: false };
+        }
+        state.confirmed = next;
+        state.confirmedSound = sound;
+        mixerVolumes[state.tab.id] = next;
+        await storageSet({ [PRO_MIXER_VOLUMES_KEY]: mixerVolumes });
+        if (state.tab.id === activeTabId) {
+          slider.value = String(next);
+          updateVolumeProc();
+          if (sound) {
+            effectMode = sound.effectMode; effectAmount = sound.effectAmount;
+            eqBands = normalizeEqBands(sound.eqBands);
+            effectSlider.value = String(effectAmount);
+            highlightSelectedButton(effectMode); updateEffectsIntensityProc();
+            syncEqualizerUI(); clearLoadedPreset();
+          }
+        }
+        if (state.pending === null) renderMixerRowVolume(row, next);
+      } catch (error) {
+        if (state.pending !== null) continue;
+        renderMixerRowVolume(row, state.confirmed);
+        state.sound = structuredClone(state.confirmedSound);
+        if (selectedMixerRow === row) renderMixerSound();
+        state.error.textContent = error.message;
+        state.error.classList.remove("hidden");
+        if (selectedMixerRow === row) setMixerModalMessage(error.message);
+      }
     }
-    await storageSet(valuesToStore);
-    updateSelectedMixerVolume(settings.volume);
-    if (selectedMixerTab.id === activeTabId) updateVolumeProc();
-    setMixerModalMessage("Current volume, effects and EQ applied.", true);
-  } catch (error) {
-    selectedMixerRow?.classList.add("mixerError");
-    setMixerModalMessage(error.message);
   } finally {
-    applyCurrentSettingsButton.disabled = false;
+    state.saving = false;
   }
+}
+
+function createMixerRow(tab, value) {
+  const row = document.createElement("div");
+  row.className = "mixerTabRow";
+  const heading = document.createElement("div");
+  heading.className = "mixerRowHeading";
+  const identity = document.createElement("div");
+  identity.className = "mixerIdentity";
+  const favicon = document.createElement("img");
+  favicon.alt = "";
+  favicon.addEventListener("error", () => { favicon.src = "icons/icon32.png"; }, { once: true });
+  const copy = document.createElement("span");
+  const name = document.createElement("strong");
+  const detail = document.createElement("small");
+  copy.append(name, detail);
+  identity.append(favicon, copy);
+  const status = document.createElement("span");
+  status.className = "mixerTabStatus";
+  const options = mixerIconButton("mixer", "More tab settings", "mixerSettingsButton");
+  options.addEventListener("click", () => openMixerSettings(row._mixer.tab, row, row._mixer.value));
+  heading.append(identity, status, options);
+  const controls = document.createElement("div");
+  controls.className = "mixerInlineControls";
+  const mute = mixerIconButton("volume", "Mute tab", "mixerMuteButton");
+  mute.addEventListener("click", () => {
+    const state = row._mixer;
+    changeMixerVolume(row, state.value === 0 || state.tab.mutedInfo?.muted ? state.beforeMute : 0);
+  });
+  const range = document.createElement("input");
+  range.type = "range";
+  range.className = "mixerInlineSlider";
+  range.min = "0"; range.max = "1000"; range.step = "1";
+  range.addEventListener("input", () => changeMixerVolume(row, Math.round((Number(range.value) / 1000) ** 2 * getMaxVolume())));
+  range.addEventListener("keydown", event => {
+    if (!["ArrowLeft", "ArrowDown", "ArrowRight", "ArrowUp"].includes(event.key)) return;
+    event.preventDefault();
+    const direction = ["ArrowLeft", "ArrowDown"].includes(event.key) ? -1 : 1;
+    changeMixerVolume(row, row._mixer.value + direction * (event.shiftKey ? 10 : 1));
+  });
+  const field = document.createElement("label");
+  field.className = "mixerNumberField";
+  const number = document.createElement("input");
+  number.type = "number"; number.min = "0"; number.max = String(getMaxVolume()); number.step = "1";
+  number.addEventListener("change", () => changeMixerVolume(row, number.value));
+  number.addEventListener("keydown", event => { if (event.key === "Enter") number.blur(); });
+  const unit = document.createElement("span");
+  unit.textContent = "%";
+  field.append(number, unit);
+  const reset = mixerIconButton("reset", "Reset volume to 100%", "mixerResetButton");
+  reset.addEventListener("click", () => changeMixerVolume(row, 100));
+  controls.append(mute, range, field, reset);
+  const error = document.createElement("p");
+  error.className = "mixerRowError hidden";
+  error.setAttribute("role", "status");
+  row.append(heading, controls, error);
+  row._mixer = { tab, value, confirmed: value, beforeMute: value || 100, pending: null, saving: false,
+    favicon, name, detail, status, mute, range, number, error, options };
+  return row;
 }
 
 async function refreshMixerTabs() {
   if (!isProActive || !mixerTabList) return;
+  const revision = ++mixerRefreshRevision;
   refreshMixerButton.disabled = true;
   try {
-    const [tabs, captureStatus] = await Promise.all([
-      chrome.tabs.query({ audible: true, currentWindow: true }),
-      chrome.runtime.sendMessage({ type: "ZAZ_OFFSCREEN_STATUS", target: "offscreen" })
-        .catch(() => ({ tabIds: [] })),
-    ]);
-    const capturedTabIds = new Set(Array.isArray(captureStatus?.tabIds) ? captureStatus.tabIds : []);
-    mixerTabList.replaceChildren();
+    const windowTabs = await chrome.tabs.query({ currentWindow: true });
+    const tabs = windowTabs.filter(tab => Number.isInteger(tab.id) && /^(https?|file):/.test(tab.url || ""));
+    tabs.sort((a, b) => Number(!!b.audible) - Number(!!a.audible) || Number(b.id === activeTabId) - Number(a.id === activeTabId) || a.index - b.index);
+    const hostnames = [...new Set(tabs.map(tab => new URL(tab.url).hostname))];
+    const savedSites = await storageGet(hostnames);
+    const savedTabs = await chrome.storage.session.get(tabs.map(tab => `tvmTabSettings:${tab.id}`));
+    if (revision !== mixerRefreshRevision) return;
+    for (const [id, row] of mixerRows) {
+      if (!tabs.some(tab => tab.id === id)) {
+        if (presetMixerTarget === row) {
+          presetMixerTarget = null;
+          closeModal(savePresetModal); closeModal(loadPresetModal);
+        }
+        if (selectedMixerRow === row) { closeModal(mixerSettingsModal); selectedMixerTab = null; selectedMixerRow = null; }
+        row.remove(); mixerRows.delete(id);
+      }
+    }
+    mixerTabList.querySelectorAll(".mixerEmpty").forEach(node => node.remove());
     if (!tabs.length) {
       const empty = document.createElement("p");
       empty.className = "mixerEmpty";
-      empty.textContent = "No audible tabs right now. Start playback, then refresh.";
+      empty.textContent = "Your website tabs will appear here. You can adjust them before playback.";
       mixerTabList.appendChild(empty);
-      return;
     }
-
-    tabs.forEach((tab) => {
-      const row = document.createElement("div");
-      row.className = "mixerTabRow";
-      const identity = document.createElement("div");
-      identity.className = "mixerIdentity";
-      const favicon = document.createElement("img");
-      favicon.src = tab.favIconUrl || "icons/icon32.png";
-      favicon.alt = "";
-      const copy = document.createElement("span");
-      const name = document.createElement("strong");
-      name.textContent = tabDisplayName(tab);
-      const title = document.createElement("small");
-      title.textContent = tab.title || "Playing audio";
-      copy.append(name, title);
-
-      const needsConnection = tab.id !== activeTabId && !capturedTabIds.has(tab.id);
-      if (needsConnection) {
-        const connectionNote = document.createElement("small");
-        connectionNote.className = "mixerConnectionNote";
-        connectionNote.textContent = "Open TVM on this tab once to connect";
-        copy.append(connectionNote);
-        row.classList.add("mixerNeedsConnection");
+    tabs.forEach((tab, index) => {
+      let row = mixerRows.get(tab.id);
+      const savedTab = savedTabs[`tvmTabSettings:${tab.id}`];
+      const tabSettings = savedTab?.origin === new URL(tab.url).origin ? savedTab.settings : null;
+      if (!row) {
+        const stored = tabSettings ? Number(tabSettings.volume) : NaN;
+        const fallback = tab.id === activeTabId ? Number(slider.value) : Number(savedSites[new URL(tab.url).hostname]?.volume ?? 100);
+        const value = Math.max(0, Math.min(getMaxVolume(), Number.isFinite(stored) ? stored : fallback));
+        row = createMixerRow(tab, value);
+        row._mixer.sound = normalizeMixerSound(tabSettings || (tab.id === activeTabId ? { effectMode, effectAmount, eqBands } : savedSites[new URL(tab.url).hostname]));
+        row._mixer.confirmedSound = structuredClone(row._mixer.sound);
+        mixerRows.set(tab.id, row);
       }
-      identity.append(favicon, copy);
-
-      const storedMixerVolume = Number(mixerVolumes[tab.id]);
-      const defaultMixerVolume = tab.id === activeTabId ? Number(slider.value) : 100;
-      const maxVolume = getMaxVolume();
-      const value = Math.max(0, Math.min(maxVolume, Number.isFinite(storedMixerVolume) ? storedMixerVolume : defaultMixerVolume));
-      const settingsButton = document.createElement("button");
-      settingsButton.className = "mixerSettingsButton";
-      settingsButton.type = "button";
-      settingsButton.disabled = needsConnection;
-      settingsButton.setAttribute("aria-label", `Open settings for ${name.textContent}`);
-      const settingsLabel = document.createElement("span");
-      settingsLabel.textContent = "Settings";
-      const settingsValue = document.createElement("small");
-      settingsValue.className = "mixerSettingsValue";
-      settingsValue.textContent = `${value}%`;
-      const chevron = document.createElement("span");
-      chevron.className = "mixerSettingsChevron";
-      chevron.setAttribute("aria-hidden", "true");
-      chevron.textContent = "›";
-      settingsButton.append(settingsLabel, settingsValue, chevron);
-      settingsButton.addEventListener("click", () => openMixerSettings(tab, row, Number(mixerVolumes[tab.id] ?? value)));
-      row.append(identity, settingsButton);
-      mixerTabList.appendChild(row);
+      const state = row._mixer;
+      state.tab = tab;
+      renderMixerRowStatus(row);
+      state.favicon.src = tab.favIconUrl || "icons/icon32.png";
+      state.name.textContent = tab.title || tabDisplayName(tab);
+      state.name.title = tab.title || tabDisplayName(tab);
+      state.detail.textContent = `${new URL(tab.url).hostname || "Local file"}${tab.id === activeTabId ? " · Current tab" : ""}`;
+      state.options.setAttribute("aria-label", `More settings for ${state.name.textContent}`);
+      state.range.setAttribute("aria-label", `Volume for ${state.name.textContent}`);
+      state.number.setAttribute("aria-label", `Volume percentage for ${state.name.textContent}`);
+      state.number.max = String(getMaxVolume());
+      if (!row.contains(document.activeElement) && !state.saving) {
+        const value = tabSettings ? Number(tabSettings.volume) : tab.id === activeTabId ? Number(slider.value) : state.value;
+        state.confirmed = Math.max(0, Math.min(getMaxVolume(), value));
+        renderMixerRowVolume(row, state.confirmed);
+      }
+      // Preserve the focused control and its position during editing.
+      if (!mixerTabList.contains(document.activeElement) && mixerTabList.children[index] !== row) {
+        mixerTabList.insertBefore(row, mixerTabList.children[index] || null);
+      } else if (!row.isConnected) mixerTabList.appendChild(row);
     });
+  } catch (error) {
+    if (!mixerRows.size) {
+      const error = document.createElement("p");
+      error.className = "mixerEmpty";
+      error.textContent = "Tabs could not be loaded. Try refreshing.";
+      mixerTabList.replaceChildren(error);
+    }
   } finally {
-    refreshMixerButton.disabled = false;
+    if (revision === mixerRefreshRevision) refreshMixerButton.disabled = false;
   }
+}
+
+function scheduleMixerRefresh() {
+  window.clearTimeout(mixerRefreshTimer);
+  mixerRefreshTimer = window.setTimeout(() => refreshMixerTabs(), 250);
 }
 
 function animateMixerRefresh() {
@@ -1694,24 +1980,19 @@ async function setupProTools() {
     animateMixerRefresh();
     refreshMixerTabs();
   });
-  mixerModalVolumeSlider.addEventListener("input", () => {
-    if (!selectedMixerTab?.id) return;
-    const nextVolume = updateSelectedMixerVolume(mixerModalVolumeSlider.value);
-    mixerVolumes[selectedMixerTab.id] = nextVolume;
-    storageSet({ [PRO_MIXER_VOLUMES_KEY]: mixerVolumes });
-    selectedMixerRow?.classList.remove("mixerError");
-    setMixerModalMessage();
-    applyMixerVolume(selectedMixerTab, nextVolume).catch((error) => {
-      selectedMixerRow?.classList.add("mixerError");
-      setMixerModalMessage(error.message);
-    });
-    if (selectedMixerTab.id === activeTabId) {
-      slider.value = String(nextVolume);
-      updateVolumeProc();
-      savePreset(nextVolume, effectMode, effectAmount);
-    }
+  mixerQuickEffects.querySelectorAll("button").forEach(button => {
+    button.addEventListener("click", () => changeMixerSound(sound => { sound.effectMode = button.dataset.mode; }));
   });
-  applyCurrentSettingsButton.addEventListener("click", applyCurrentSettingsToMixerTab);
+  mixerEffectSlider.addEventListener("input", () => changeMixerSound(sound => { sound.effectAmount = Number(mixerEffectSlider.value); }));
+  document.getElementById("mixerSavePreset").addEventListener("click", () => openPresetDialog(savePresetModal, selectedMixerRow));
+  document.getElementById("mixerLoadPreset").addEventListener("click", () => openPresetDialog(loadPresetModal, selectedMixerRow));
+  document.getElementById("mixerResetEq").addEventListener("click", () => changeMixerSound(sound => { sound.eqBands = [...EQ_DEFAULTS]; }));
+  chrome.tabs.onCreated.addListener(scheduleMixerRefresh);
+  chrome.tabs.onRemoved.addListener(scheduleMixerRefresh);
+  chrome.tabs.onUpdated.addListener((id, changes) => {
+    if (["audible", "mutedInfo", "title", "url", "status"].some(key => key in changes)) scheduleMixerRefresh();
+  });
+  mixerTabList.addEventListener("focusout", scheduleMixerRefresh);
   setupSleepTimer();
 }
 
@@ -1731,6 +2012,8 @@ function savePreset(volume, mode, amount, bands = eqBands) {
 }
 
 async function updateAudio(volume) {
+  await powerReady;
+  if (!extensionEnabled) return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
 
@@ -1791,7 +2074,7 @@ themeToggle.addEventListener("change", () => {
 });
 
 function initializeActiveTab() {
-chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+chrome.tabs.query({ active: true, currentWindow: true }, async ([tab]) => {
   if (!tab?.url) return;
   activeTabId = tab.id;
   meterPort.postMessage({ type: "ZAZ_METER_SUBSCRIBE", tabId: activeTabId });
@@ -1812,8 +2095,11 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
   }
   siteName.textContent = formatSiteName(hostname);
 
+  const savedTab = (await chrome.storage.session.get(`tvmTabSettings:${tab.id}`))[`tvmTabSettings:${tab.id}`];
   chrome.storage.local.get([hostname], (result) => {
-    const preset = result[hostname];
+    const preset = savedTab?.origin === new URL(tab.url).origin
+      ? { ...savedTab.settings, proAudio: savedTab.settings.pro }
+      : result[hostname];
 
     if (!preset) {
       loadedPresetName = null;

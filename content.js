@@ -1,11 +1,16 @@
 (function () {
   "use strict";
+  if (window.__zazVolumeManager) return;
 
   const EQ_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
   const EQ_Q_VALUES = [0.8, 1, 1, 1, 1, 1.1, 1.1, 1.2, 1, 0.8];
   const BASS_EFFECT_MULTIPLIER = 1.5;
+  const nativeConnect = AudioNode.prototype.connect;
+  const nativeDisconnect = AudioNode.prototype.disconnect;
 
   window.__zazVolumeManager = {
+    enabled: false, // Wait for persisted power state before processing.
+    powerRevision: 0,
     gain: 1,
     effectMode: "none",
     effectAmount: 0,
@@ -38,6 +43,7 @@
   }
 
   function createProcessingChain(ctx) {
+    const input = ctx.createGain();
     const gain = ctx.createGain();
     const effectBass = ctx.createBiquadFilter();
     const effectVoice = ctx.createBiquadFilter();
@@ -89,7 +95,7 @@
     limiter.connect(ctx.destination);
 
     return {
-      gain, effectBass, effectVoice, eqFilters, dialogueHighpass, dialogueWarmth,
+      input, routedPower: null, gain, effectBass, effectVoice, eqFilters, dialogueHighpass, dialogueWarmth,
       dialoguePresence, dialogueCompressor, adaptiveCompressor, adaptiveGain, limiter, stereo,
     };
   }
@@ -133,6 +139,11 @@
       const nodes = manager.nodes.get(ctx);
       if (!nodes) return;
 
+      if (nodes.routedPower !== manager.enabled) {
+        nativeDisconnect.call(nodes.input);
+        nativeConnect.call(nodes.input, manager.enabled ? nodes.effectBass : ctx.destination);
+        nodes.routedPower = manager.enabled;
+      }
       nodes.gain.gain.value = manager.gain;
       nodes.effectBass.gain.value = manager.effectMode === "bass"
         ? manager.effectAmount * BASS_EFFECT_MULTIPLIER
@@ -182,7 +193,7 @@
       manager.nodes.set(ctx, chain);
       manager.contexts.add(ctx);
 
-      ctx.__zazDestination = chain.effectBass;
+      ctx.__zazDestination = chain.input;
       ctx.__realDestination = ctx.destination;
       applySettings();
 
@@ -223,9 +234,14 @@
         const source = ctx.createMediaElementSource(el);
         const chain = createProcessingChain(ctx);
 
-        source.connect(chain.effectBass);
+        source.connect(chain.input);
 
         el.__zazCtx = ctx;
+        // The mixer can prepare a paused element before the page has a user gesture.
+        // Resume its processing context when playback is subsequently requested.
+        el.addEventListener("play", () => {
+          if (ctx.state === "suspended") ctx.resume().catch(() => {});
+        });
         manager.nodes.set(ctx, chain);
         manager.contexts.add(ctx);
 
@@ -271,6 +287,12 @@
   }
 
   window.addEventListener("message", (e) => {
+    if (e.source === window && e.data?.type === "TVM_POWER") {
+      if (manager.enabled !== (e.data.enabled !== false)) manager.powerRevision++;
+      manager.enabled = e.data.enabled !== false;
+      applySettings();
+      return;
+    }
     if (e.data?.type === "TVM_REVOKE_PRO") {
       clearTimeout(manager.proExpiryTimer);
       manager.pro = null;
@@ -302,4 +324,5 @@
       applySettings();
     }
   });
+  window.postMessage({ type: "TVM_POWER_READY" }, "*");
 })();

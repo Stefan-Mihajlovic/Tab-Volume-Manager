@@ -7,7 +7,7 @@
   </picture>
 </h1>
 
-Tab Volume Manager is a browser audio workspace for controlling and enhancing the sound of every tab. It combines per-site volume control, quick effects, a visual equalizer, saved presets, and an optional Pro audio suite. Version 1.5 adds a free 7-day Pro trial.
+Tab Volume Manager is a browser audio workspace for controlling and enhancing the sound of every tab. It combines per-site volume control, quick effects, a visual equalizer, saved presets, and an optional Pro audio suite. Version 1.6 adds a global power toggle, a redesigned Multi-tab Mixer, and tab-specific effects and EQ that can be prepared before playback.
 
 ## Free
 
@@ -28,7 +28,7 @@ Try every Pro tool free for 7 days, without a card or automatic charge. Cancel e
 - Adaptive Volume for balanced loudness
 - Movie Dialogue enhancement
 - Full 10-band equalizer
-- Multi-tab Mixer for every audible tab
+- Multi-tab Mixer for website tabs, before or during playback
 - Sleep Timer with a gentle fade-out
 - Stereo Tools: left/right balance, channel swap, and stereo width (mono to wide)
 - Unlimited presets and volume boost up to 1500%

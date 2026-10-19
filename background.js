@@ -128,6 +128,13 @@ async function sanitizeSettings(settings = {}) {
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
+  if (changes.tvmEnabled) {
+    void chrome.runtime.sendMessage({ target: "offscreen", type: "TVM_POWER", enabled: changes.tvmEnabled.newValue !== false }).catch(() => {});
+  }
+  if (changes.tvmEnabled?.newValue === false) {
+    void chrome.alarms.clear(SLEEP_TIMER_ALARM);
+    void storageRemove(SLEEP_TIMER_KEY);
+  }
   if (changes[TVM_ENTITLEMENT_KEY] || changes[TVM_INSTALLATION_ID_KEY] || changes[TVM_TRIAL_KEY]) {
     entitlementCache = { checkedAt: 0, valid: false, expiresAt: 0, plan: null };
     void syncTrialAlarm();
@@ -206,6 +213,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function ensureOffscreenDocument() {
+  if (creatingOffscreenDocument) return creatingOffscreenDocument;
   const offscreenUrl = chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH);
   const contexts = await chrome.runtime.getContexts({
     contextTypes: ["OFFSCREEN_DOCUMENT"],
@@ -235,6 +243,7 @@ async function fadeAndPauseTab(tabId, durationMs) {
     world: "MAIN",
     func: async (fadeDuration) => {
       const manager = window.__zazVolumeManager;
+      const powerRevision = manager?.powerRevision;
       if (manager?.contexts && manager?.nodes) {
         manager.contexts.forEach((context) => {
           const gain = manager.nodes.get(context)?.gain?.gain;
@@ -246,6 +255,7 @@ async function fadeAndPauseTab(tabId, durationMs) {
         });
       }
       await new Promise((resolve) => setTimeout(resolve, fadeDuration));
+      if (manager?.enabled === false || manager?.powerRevision !== powerRevision) return;
       document.querySelectorAll("video, audio").forEach((media) => media.pause());
     },
     args: [durationMs],
@@ -271,6 +281,7 @@ async function restoreTabGain(tabId) {
 }
 
 async function executeSleepTimer(timerState) {
+  if ((await storageGet("tvmEnabled")).tvmEnabled === false) return;
   const query = { audible: true };
   if (Number.isInteger(timerState?.windowId)) query.windowId = timerState.windowId;
   const audibleTabs = await chrome.tabs.query(query).catch(() => []);
@@ -287,7 +298,10 @@ async function executeSleepTimer(timerState) {
   }).catch(() => null);
   const pageFades = tabIds.map((tabId) => fadeAndPauseTab(tabId, SLEEP_FADE_DURATION_MS).catch(() => null));
   await Promise.all([offscreenFade, ...pageFades]);
-  await Promise.allSettled(tabIds.map((tabId) => chrome.tabs.update(tabId, { muted: true })));
+  const currentState = await storageGet(["tvmEnabled", SLEEP_TIMER_KEY]);
+  if (currentState.tvmEnabled !== false && currentState[SLEEP_TIMER_KEY]?.endsAt === timerState?.endsAt) {
+    await Promise.allSettled(tabIds.map((tabId) => chrome.tabs.update(tabId, { muted: true })));
+  }
   await Promise.allSettled([
     chrome.runtime.sendMessage({
       type: "ZAZ_OFFSCREEN_RESTORE",
@@ -330,6 +344,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return { ok: true };
     }
 
+    if ((await storageGet("tvmEnabled")).tvmEnabled === false) {
+      throw new Error("Turn on Tab Volume Manager to start a sleep timer.");
+    }
     if (!await verifyStoredEntitlement()) {
       throw new Error("Sleep Timer requires an active Pro license.");
     }
@@ -350,6 +367,81 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
+const tabSettingsKey = tabId => `tvmTabSettings:${tabId}`;
+
+function queueTabTask(tabId, work) {
+  const task = (tabTasks.get(tabId) || Promise.resolve()).catch(() => {}).then(work);
+  tabTasks.set(tabId, task);
+  const cleanup = () => { if (tabTasks.get(tabId) === task) tabTasks.delete(tabId); };
+  task.then(cleanup, cleanup);
+  return task;
+}
+
+async function rememberTabSettings(tabId, settings) {
+  const tab = await chrome.tabs.get(tabId);
+  if (!/^(https?|file):/.test(tab.url || "")) return;
+  await chrome.storage.session.set({ [tabSettingsKey(tabId)]: { origin: new URL(tab.url).origin, settings } });
+  return tab;
+}
+
+async function savedSettingsForTab(tab) {
+  const key = tabSettingsKey(tab.id);
+  const saved = (await chrome.storage.session.get(key))[key];
+  if (saved?.origin === new URL(tab.url).origin) return saved.settings;
+  const hostname = new URL(tab.url).hostname;
+  const site = (await storageGet(hostname))[hostname];
+  return site ? { ...site, pro: site.proAudio } : null;
+}
+
+async function applyPageAudioSettings(tabId, settings) {
+  const publish = () => chrome.scripting.executeScript({
+    target: { tabId }, world: "MAIN",
+    func: (nextSettings) => {
+      if (!window.__zazVolumeManager) return false;
+      window.postMessage({ ...nextSettings, type: "ZAZ_VOLUME_UPDATE" }, "*");
+      return true;
+    },
+    args: [settings],
+  });
+  let results = await publish();
+  if (!results.some(result => result.result === true)) {
+    // Tabs open before an extension reload may not have the audio code yet.
+    await chrome.scripting.executeScript({ target: { tabId }, world: "MAIN", files: ["stereo.js", "content.js"] });
+    results = await publish();
+  }
+  await chrome.scripting.executeScript({ target: { tabId }, files: ["power-bridge.js"] });
+  const enabled = (await storageGet("tvmEnabled")).tvmEnabled !== false;
+  await chrome.scripting.executeScript({ target: { tabId }, world: "MAIN", func: enabled => window.postMessage({ type: "TVM_POWER", enabled }, "*"), args: [enabled] });
+  return results.some(result => result.result === true);
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "TVM_GET_POWER") {
+    storageGet("tvmEnabled").then(stored => sendResponse({ enabled: stored.tvmEnabled !== false }));
+    return true;
+  }
+  if (message?.type !== "TVM_RESTORE_TAB" || !sender.tab?.id) return false;
+  const tabId = sender.tab.id;
+  queueTabTask(tabId, async () => {
+    const tab = await chrome.tabs.get(tabId);
+    if (!/^(https?|file):/.test(tab.url || "")) return { ok: false };
+    const saved = await savedSettingsForTab(tab);
+    if (!saved) return { ok: true };
+    const settings = await sanitizeSettings(saved);
+    const captured = (await chrome.tabCapture.getCapturedTabs()).some(item => item.tabId === tabId && ["active", "pending"].includes(item.status));
+    if (captured) {
+      await ensureOffscreenDocument();
+      const result = await chrome.runtime.sendMessage({ target: "offscreen", type: "ZAZ_OFFSCREEN_UPDATE", tabId, settings });
+      if (result?.ok) {
+        await applyPageAudioSettings(tabId, { volume: 100, effectMode: "none", effectAmount: 0, eqBands: Array(10).fill(0), pro: null });
+        return result;
+      }
+    }
+    return { ok: await applyPageAudioSettings(tabId, settings) };
+  }).then(sendResponse).catch(() => sendResponse({ ok: false, pending: true }));
+  return true;
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== "ZAZ_CAPTURE_TAB") return false;
 
@@ -358,49 +450,84 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       throw new Error("Missing tab id.");
     }
 
-    await ensureOffscreenDocument();
+    if ((await storageGet("tvmEnabled")).tvmEnabled === false) return { ok: true, bypassed: true };
     const settings = await sanitizeSettings(message.settings);
+    const tab = await rememberTabSettings(message.tabId, settings);
+    if (tab?.discarded) return { ok: true, pending: true };
+    const preparePage = async () => {
+      try {
+        if (await applyPageAudioSettings(message.tabId, settings)) return { ok: true, processing: "page" };
+      } catch { /* Loading/discarded tabs will restore saved settings when ready. */ }
+      return { ok: true, pending: true };
+    };
+    try {
+      if (message.allowPageFallback) {
+        const capturedTabs = await chrome.tabCapture.getCapturedTabs();
+        const captured = capturedTabs.some(tab => tab.tabId === message.tabId && ["active", "pending"].includes(tab.status));
+        if (!captured) {
+          return preparePage();
+        }
+      }
+      await ensureOffscreenDocument();
 
-    let response = await chrome.runtime.sendMessage({
-      type: "ZAZ_OFFSCREEN_UPDATE",
-      target: "offscreen",
-      tabId: message.tabId,
-      settings,
-    });
+      let response;
+      const update = { type: "ZAZ_OFFSCREEN_UPDATE", target: "offscreen", tabId: message.tabId, settings };
+      try {
+        response = await chrome.runtime.sendMessage(update);
+      } catch (error) {
+        // An old offscreen document can survive a code reload with no listener.
+        await chrome.offscreen.closeDocument().catch(() => {});
+        await ensureOffscreenDocument();
+        try { response = await chrome.runtime.sendMessage(update); }
+        catch (retryError) {
+          if (message.allowPageFallback) return preparePage();
+          throw retryError;
+        }
+      }
 
-    if (response?.needsStream) {
-      const streamId = await chrome.tabCapture.getMediaStreamId({
-        targetTabId: message.tabId,
-      });
+      if (response?.needsStream) {
+        let streamId;
+        try {
+          streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: message.tabId });
+        } catch (error) {
+          if (!message.allowPageFallback) throw error;
+          return preparePage();
+        }
 
-      response = await chrome.runtime.sendMessage({
-        type: "ZAZ_OFFSCREEN_UPDATE",
-        target: "offscreen",
-        tabId: message.tabId,
-        streamId,
-        settings,
-      });
+        response = await chrome.runtime.sendMessage({
+          type: "ZAZ_OFFSCREEN_UPDATE",
+          target: "offscreen",
+          tabId: message.tabId,
+          streamId,
+          settings,
+        });
+      }
+
+      // A previously prepared page must not apply the same effects twice once captured.
+      if (response?.ok) {
+        await applyPageAudioSettings(message.tabId, {
+          volume: 100, effectMode: "none", effectAmount: 0,
+          eqBands: Array(10).fill(0), pro: null, proValidUntil: 0,
+        }).catch(() => {});
+      }
+      if (!response?.ok && message.allowPageFallback) return preparePage();
+      return response || { ok: false, error: "Audio processing is not ready." };
+    } catch (error) {
+      if (message.allowPageFallback) return preparePage();
+      throw error;
     }
-
-    return response || { ok: true };
   };
 
-  const previousTask = tabTasks.get(message.tabId) || Promise.resolve();
-  const task = previousTask.catch(() => {}).then(updateTab);
-  tabTasks.set(message.tabId, task);
-
-  task
+  queueTabTask(message.tabId, updateTab)
     .then(sendResponse)
-    .catch((error) => sendResponse({ ok: false, error: error.message }))
-    .finally(() => {
-      if (tabTasks.get(message.tabId) === task) tabTasks.delete(message.tabId);
-    });
+    .catch((error) => sendResponse({ ok: false, error: error.message }));
 
   return true;
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabTasks.delete(tabId);
+  void chrome.storage.session.remove(tabSettingsKey(tabId));
   meterSubscribers.delete(tabId);
   latestMeterLevels.delete(tabId);
   chrome.runtime.sendMessage({

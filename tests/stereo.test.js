@@ -5,7 +5,7 @@ const vm = require("node:vm");
 
 function runtime() {
   const handlers = [];
-  const context = vm.createContext({ handlers, chrome: { runtime: { onMessage: { addListener(fn) { handlers.push(fn); } } } } });
+  const context = vm.createContext({ handlers, chrome: { storage: { local: { get: async () => ({}) }, onChanged: { addListener() {} } }, runtime: { sendMessage: async () => ({ enabled: true }), onMessage: { addListener(fn) { handlers.push(fn); } } } } });
   vm.runInContext(fs.readFileSync(`${__dirname}/../stereo.js`, "utf8"), context);
   return context;
 }
@@ -69,6 +69,7 @@ test("Page audio contexts created after settings arrive restore stereo, and expi
       for (const key of ["gain", "frequency", "Q", "threshold", "knee", "ratio", "attack", "release"]) this[key] = parameter();
     }
     connect() {}
+    disconnect() {}
   }
   class AudioContext {
     constructor() { this.currentTime = 0; this.destination = new AudioNode(this); }
@@ -80,7 +81,7 @@ test("Page audio contexts created after settings arrive restore stereo, and expi
   }
   let messageHandler;
   let expiryHandler;
-  const window = { AudioContext, addEventListener(type, handler) { messageHandler = handler; } };
+  const window = { AudioContext, postMessage() {}, addEventListener(type, handler) { messageHandler = handler; } };
   const context = vm.createContext({ window, AudioNode, document: { readyState: "loading", addEventListener() {} }, setTimeout(fn) { expiryHandler = fn; return 1; }, clearTimeout() {} });
   vm.runInContext(fs.readFileSync(`${__dirname}/../stereo.js`, "utf8"), context);
   vm.runInContext(fs.readFileSync(`${__dirname}/../content.js`, "utf8"), context);
